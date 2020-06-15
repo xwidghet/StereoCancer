@@ -4,8 +4,8 @@ An open-source stereo-correct screen-space shader for Unity, mainly intended for
 ![](https://github.com/xwidghet/StereoCancer/blob/master/Example%20Gifs/kaleidescope_and_voroni_shader.gif?raw=true)
 ![](https://github.com/xwidghet/StereoCancer/blob/master/Example%20Gifs/overboard_shader.gif?raw=true)
 
-# Features
-Image Overlay (Blended, Tiled, Clamped, Alpha-Cutout)  
+# Features (Shown above)
+Image Overlay (Blended, Tiled, Clamped, Alpha-CutOff)  
 Rotation  
 Movement  
 Skew  
@@ -25,10 +25,12 @@ Geometric Dither
 Stripes  
 HSV Color Adjustment  
 Scalable Static/TV Noise (Referred to as Signal Noise)  
-RGB Color displacement (Referred to as Red/Green/Blue Move)  
+RGB Color Displacement (Referred to as Red/Green/Blue Move)  
+Screen-Space Shader Opacity
 
 # Usage
 1. Create a cube.
-2. Adjust the scale of the cube. Anyone who enters the cube, or sees the cube, will see the screen-space shader. The effects are independent of the object scale. So if you find it was too big or too small, you can always adjust it later.
-3. Create a material from the StereoCancer shader, and put it on the cube.
-4. Adjust the parameters on the material to your liking, or create an animation.
+2. Adjust the scale of the cube. Anyone who enters the cube, or sees the cube, will see the screen-space shader. The screen-space shader effects are independent of the object scale. So if you find it was too big or small, you can always adjust it later.
+3. Add StereoCancer to your unity project.
+4. Create a material from the StereoCancer shader, and put it on the cube.
+5. Adjust the parameters on the material to your liking, or create an animation.
