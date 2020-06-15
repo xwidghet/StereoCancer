@@ -597,15 +597,15 @@
 					// Not stereo correct, must use the above Shrink Height/Shrink Width functions
 					//screenUV *= _MemeTex_ST.xy;
 
-#ifdef UNITY_SINGLE_PASS_STEREO
-					// Ooga, Booga.
-					screenWidth *= 2;
-#endif
-
 					// Ensure the image doesn't get stretched or squished
 					// depending on the users HMD/Display aspect ratio.
 					float screenWidth = _ScreenParams.x;
 					float screenHeight = _ScreenParams.y;
+
+#ifdef UNITY_SINGLE_PASS_STEREO
+					// Ooga, Booga.
+					screenWidth *= 2;
+#endif
 
 					float ratioX = screenWidth / _MemeTex_TexelSize.z;
 					float ratioY = screenHeight / _MemeTex_TexelSize.w;
