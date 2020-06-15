@@ -24,6 +24,7 @@ Voroni Noise
 Geometric Dither  
 Stripes  
 HSV Color Adjustment  
+Chromatic Abberation  
 Scalable Static/TV Noise (Referred to as Signal Noise)  
 RGB Color Displacement (Referred to as Red/Green/Blue Move)  
 Screen-Space Shader Opacity
