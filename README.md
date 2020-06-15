@@ -35,3 +35,9 @@ Screen-Space Shader Opacity
 3. Add StereoCancer to your unity project.
 4. Create a material from the StereoCancer shader, and put it on the cube.
 5. Adjust the parameters on the material to your liking, or create an animation.
+
+# Performance Considerations
+This shader automatically optimizes for performance when the strength of an effect is reduced to 0. So in the intrest of keeping what little frames the community gets in VRChat, please ensure unused effects on animations are actually fully disabled to allow the shader to run as efficiently as possible.
+
+# Advanced Usage
+I have added comments to this shader's implementation file (StereoCancer v0.1.shader) to hopefully make it easy for users to extend this shader, or write their own afterwards.
