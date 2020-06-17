@@ -35,7 +35,9 @@
 #ifndef STEREO_CANCER_FUNCTIONS_CGINC
 #define STEREO_CANCER_FUNCTIONS_CGINC
 
-// Cancer effects begin
+  ///////////////////////////
+ // Distortion functions ///
+///////////////////////////
 
 float4 computeStereoUV(float4 worldCoordinates)
 {
@@ -115,8 +117,8 @@ float4 stereoZoom(float4 worldCoordinates, float3 camFront, float distance)
 
 float4 stereoSkewX(float4 worldCoordinates, float3 camRight, float interval, float distance, float offset)
 {
-	int intPosY = floor(abs(worldCoordinates.y));
-	int skewDir = -1 + 2 * step(1, (intPosY % 2));
+	float intPosY = floor(abs(worldCoordinates.y));
+	float skewDir = -1 + 2 * step(1, (intPosY % 2));
 
 	float skewVal = fmod(abs(worldCoordinates.y + offset), interval) / interval - 0.5;
 	skewVal *= skewDir;
@@ -130,8 +132,8 @@ float4 stereoSkewX(float4 worldCoordinates, float3 camRight, float interval, flo
 
 float4 stereoSkewY(float4 worldCoordinates, float3 camUp, float interval, float distance, float offset)
 {
-	int intPosX = floor(abs(worldCoordinates.x));
-	int skewDir = -1 + 2 * step(1, (intPosX % 2));
+	float intPosX = floor(abs(worldCoordinates.x));
+	float skewDir = -1 + 2 * step(1, (intPosX % 2));
 
 	float skewVal = fmod(abs(worldCoordinates.x + offset), interval) / interval - 0.5;
 	skewVal *= skewDir;
@@ -171,23 +173,26 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 	return worldCoordinates / 10;
 }
 
-float4 stereoCheckerboard(float4 coordinates, float scale)
+float4 stereoCheckerboard(float4 coordinates, float scale, float shiftDistance)
 {
-	fixed2 intPos = floor(coordinates.xy * scale + 0.5);
+	float2 intPos = floor(coordinates.xy / scale + 0.5);
 
-	int offset = 1 + -2 * step(1, (abs(intPos.y) % 2));
-	int dir = 1 + -2 * step(1, (abs(intPos.x) % 2));
+	float offset = 1 + -2 * step(1, (abs(intPos.y) % 2));
+	float dir = 1 + -2 * step(1, (abs(intPos.x) % 2));
 
-	fixed2 integerOffset = fixed2(dir * offset, 0);
+	float2 integerOffset = float2(dir * shiftDistance * offset, 0);
 
-	coordinates.xy += float2(integerOffset) / scale;
+	coordinates.xy += float2(integerOffset);
 
 	return coordinates;
 }
 
 float4 stereoQuantization(float4 worldCoordinates, float scale)
 {
-	fixed2 intPos = floor(worldCoordinates.xy * scale + 0.5);
+	// Add 0.5 to make it so that the center of the screen is on
+	// the center of a quantization square, rather than the corner
+	// between 4 squares.
+	float2 intPos = floor(worldCoordinates.xy * scale + 0.5);
 	worldCoordinates.xy = (intPos / scale);
 
 	return worldCoordinates;
@@ -233,9 +238,16 @@ float4 stereoFishEye(float4 worldCoordinates, float3 camFront, float intensity)
 	return worldCoordinates;
 }
 
-float4 stereoWave(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
+float4 stereoSinWave(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
 {
 	worldCoordinates.xyz += camRight * sin((worldCoordinates.y + offset) * density) * amplitude;
+
+	return worldCoordinates;
+}
+
+float4 stereoTanWave(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
+{
+	worldCoordinates.xyz += camRight * tan((worldCoordinates.y + offset) * density) * amplitude;
 
 	return worldCoordinates;
 }
@@ -262,6 +274,38 @@ float4 stereoZigZagY(float4 worldCoordinates, float3 camRight, float density, fl
 		effectVal = 2.0 - effectVal;
 
 	worldCoordinates.xyz += camRight * tpdf(effectVal) * amplitude;
+
+	return worldCoordinates;
+}
+
+float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, float3 camUp, int glitchCount,
+	float maxGlitchWidth, float maxGlitchHeight, float glitchIntensity, float seed,
+	float seedInterval)
+{
+	seed = floor(seed / seedInterval);
+
+	for (int i = 0; i < glitchCount; i++)
+	{
+		// minX, maxX, minY, maxY
+		float4 boundingBox;
+		
+		boundingBox.y = gold_noise(seed + 2, seed + 3) * 100 - 50;
+		boundingBox.x = boundingBox.y - gold_noise(seed, seed + 1) * maxGlitchWidth;
+		
+		boundingBox.w = gold_noise(seed + 6, seed + 7) * 100 - 50;
+		boundingBox.z = boundingBox.w - gold_noise(seed + 4, seed + 5) * maxGlitchHeight;
+
+		if (worldCoordinates.x >= boundingBox.x && worldCoordinates.x <= boundingBox.y
+			&& worldCoordinates.y >= boundingBox.z && worldCoordinates.y <= boundingBox.w)
+		{
+			worldCoordinates.xyz += camFront * (gold_noise(seed + 8, seed + 9) - 0.5) * glitchIntensity;
+			worldCoordinates.xyz += camRight * (gold_noise(seed + 10, seed + 11) - 0.5) * glitchIntensity;
+			worldCoordinates.xyz += camUp * (gold_noise(seed + 12, seed + 13) - 0.5) * glitchIntensity;
+		}
+
+		// Don't share random values between glitch boxes
+		seed += 14;
+	}
 
 	return worldCoordinates;
 }
@@ -299,7 +343,7 @@ float4 stereoKaleidoscope(float4 worldCoordinates, float3 camFront, float angle,
 
 // This effect is pretty performance heavy in VR, so I may need to implement something which creates
 // the same effect without requiring calculating 3D voroni noise
-float4 stereoVoroniNoise(float4 worldCoordinates, float3 camFront, float3 camRight, float3 camUp, float scale, float offset, float strength, float borderSize)
+float4 stereoVoroniNoise(float4 worldCoordinates, float scale, float offset, float strength, float borderSize)
 {
 	float3 samplePoint = worldCoordinates.xyz / scale;
 	samplePoint.z += offset / 10;
@@ -324,6 +368,10 @@ float4 stereoVoroniNoise(float4 worldCoordinates, float3 camFront, float3 camRig
 	worldCoordinates.xyz += cellVector;
 	return worldCoordinates;
 }
+
+  /////////////////////
+ // Color functions //
+/////////////////////
 
 // I wonder if this naming scheme will trigger any shader 'edgelords'
 half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripeSize, float offset)
@@ -370,5 +418,61 @@ half4 colorShift(sampler2D colorShiftTexture, float4 grabPos)
 	return tex2Dproj(colorShiftTexture, grabPos);
 }
 
-// Cancer End
+half3 signalNoise(float4 worldPos, float scale, float colorization, float opacity)
+{
+	// Only seed noise with time to allow for
+	// custom noise size via world coordinates
+	//
+	// Rotate randomly really fast to hide moire artifacts
+	// when small noise size (less than 5) is used
+	//
+	// Values chosen have no mathmatical significance, they're just arbitrary values
+	// to attempt to make it difficult to percieve any pattern in the movement
+	float3 randomAxis1 = normalize(float3(2 + gold_noise(_Time.z, _Time.y - 1),
+		-4 + 3 * gold_noise(_Time.x, _Time.x),
+		6 - 5 * gold_noise(_Time.w, _Time.z)));
+
+	// TODO: Verify if high scene times (read: sitting in worlds for 5+ hours)
+	//		 results in 'low fps' noise due to floating point inaccuracy
+	//
+	//		 Though lets be real here...even if this is an issue
+	//		 it'll likely be hidden by VRChat running at cinematic
+	//		 framerates.
+	float3 noisePos = worldPos.xyz;
+	noisePos.z += gold_noise(_Time.z, _Time.y) * 10000;
+	noisePos = mul(rotAxis(randomAxis1, _Time.y * 1000), noisePos);
+
+	if (colorization != 0)
+	{
+		half4 noisecolor = half4(
+			snoise(noisePos.xyz / scale),
+			snoise(noisePos.yzx / scale),
+			snoise(noisePos.zxy / scale),
+			0);
+		noisecolor *= opacity;
+
+		// Scale the HSV value with _ColorizedSignalNoise to allow the user
+		// to decide how much color they want in the noise.
+		half3 hsvColor = rgb2hsv(noisecolor.xyz);
+		hsvColor.y = clamp(colorization, 0, 1);
+
+		return hsv2rgb(hsvColor);
+	}
+	else
+	{
+		return snoise(noisePos / scale) * opacity;
+	}
+}
+
+half3 applyHSV(half4 bgcolor, float hue, float saturation, float value)
+{
+	half3 hsvColor = rgb2hsv(bgcolor.xyz);
+	hsvColor.x += hue;
+	hsvColor.y = clamp(hsvColor.y + saturation, 0, 1);
+
+	hsvColor.z = clamp(hsvColor.z + value, 0, 1);
+
+	return hsv2rgb(hsvColor);
+}
+
 #endif

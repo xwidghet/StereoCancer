@@ -87,11 +87,16 @@
 		_ZigZagYAmplitude("ZigZag Y Amplitude", Float) = 0
 		_ZigZagYOffset("ZigZag Y Offset", Float) = 0
 
-		_WaveDensity("Wave Density", Float) = 0
-		_WaveAmplitude("Wave Amplitude", Float) = 0
-		_WaveOffset("Wave Offset", Float) = 0
+		_SinWaveDensity("Sin Wave Density", Float) = 0
+		_SinWaveAmplitude("Sin Wave Amplitude", Float) = 0
+		_SinWaveOffset("Sin Wave Offset", Float) = 0
+
+		_TanWaveDensity("Tan Wave Density", Float) = 0
+		_TanWaveAmplitude("Tan Wave Amplitude", Float) = 0
+		_TanWaveOffset("Tan Wave Offset", Float) = 0
 
 		_CheckerboardScale("Checkerboard Scale", Float) = 0
+		_CheckerboardShift("Checkerboard Shift Distance", Float) = 0
 		_Quantization("Quantization", Range(0,1)) = 0
 
 		_RingRotationAngle("Ring Rotation Angle", Float) = 3.1415926
@@ -107,6 +112,13 @@
 
 		_KaleidoscopeSegments("Kaleidoscope Segments", Range(0,32)) = 0
 		_KaleidoscopeAngle("Kaleidoscope Angle", Float) = 0
+
+		_GlitchCount("Glitch Count", Range(0, 32)) = 0
+		_MaxGlitchWidth("Max Glitch Width", Float) = 0
+		_MaxGlitchHeight("Max Glitch Height", Float) = 0
+		_GlitchIntensity("Glitch Intensity", Float) = 0
+		_GlitchSeed("Glitch Seed", Float) = 0
+		_GlitchSeedInterval("Glitch Seed Interval", Float) = 1
 
 		_NoiseScale("Simplex Noise Scale", Float) = 0
 		_NoiseStrength("Simplex Noise Strength", Float) = 0
@@ -262,6 +274,7 @@
 			float _BarYOffset;
 
 			float _CheckerboardScale;
+			float _CheckerboardShift;
 			float _Quantization;
 
 			float _RingRotationAngle;
@@ -272,9 +285,13 @@
 
 			float _FishEyeIntensity;
 
-			float _WaveDensity;
-			float _WaveAmplitude;
-			float _WaveOffset;
+			float _SinWaveDensity;
+			float _SinWaveAmplitude;
+			float _SinWaveOffset;
+
+			float _TanWaveDensity;
+			float _TanWaveAmplitude;
+			float _TanWaveOffset;
 
 			float _ZigZagXDensity;
 			float _ZigZagXAmplitude;
@@ -286,6 +303,13 @@
 
 			float _KaleidoscopeSegments;
 			float _KaleidoscopeAngle;
+
+			float _GlitchCount;
+			float _MaxGlitchWidth;
+			float _MaxGlitchHeight;
+			float _GlitchIntensity;
+			float _GlitchSeed;
+			float _GlitchSeedInterval;
 
 			float _NoiseScale;
 			float _NoiseStrength;
@@ -429,8 +453,10 @@
 				// avoid taking the performance hit of unused effects. This is used on every
 				// effect with the most intuitive value to automatically improve performance.
 
-				// For use with images (Produces stereo-incorrect image otherwise)
-				// Applied now in order to allow for layering effects on images
+				// Note: Not all effects contain all of the final parameters since I don't
+				//		 know how many effects I will add yet, and don't want to have to
+				//		 remove parameters users are using to make space for effects.
+
 				if (_ShrinkHeight != 0)
 					i.worldPos = shrink(worldVector, axisUp, i.worldPos, _ShrinkHeight);
 				if (_ShrinkWidth != 0)
@@ -463,11 +489,13 @@
 				if (_ZigZagYDensity != 0)
 					i.worldPos = stereoZigZagY(i.worldPos, axisUp, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 
-				if (_WaveDensity != 0)
-					i.worldPos = stereoWave(i.worldPos, axisRight, _WaveDensity, _WaveAmplitude, _WaveOffset);
+				if (_SinWaveDensity != 0)
+					i.worldPos = stereoSinWave(i.worldPos, axisRight, _SinWaveDensity, _SinWaveAmplitude, _SinWaveOffset);
+				if (_TanWaveDensity != 0)
+					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
 
 				if (_CheckerboardScale != 0)
-					i.worldPos = stereoCheckerboard(i.worldPos, 1.0 - _CheckerboardScale/100);
+					i.worldPos = stereoCheckerboard(i.worldPos, _CheckerboardScale, _CheckerboardShift);
 
 				if (_Quantization != 0)
 					i.worldPos = stereoQuantization(i.worldPos, 10.0 - _Quantization*10.0);
@@ -487,10 +515,16 @@
 				if(_KaleidoscopeSegments > 0)
 					i.worldPos = stereoKaleidoscope(i.worldPos, axisFront, _KaleidoscopeAngle, _KaleidoscopeSegments);
 
+				// Think you have enough function parameters there buddy?
+				if (_GlitchCount != 0 && _GlitchIntensity != 0)
+					i.worldPos = stereoGlitch(i.worldPos, axisFront, axisRight, axisUp,
+						_GlitchCount, _MaxGlitchWidth, _MaxGlitchHeight, _GlitchIntensity,
+						_GlitchSeed, _GlitchSeedInterval);
+
 				if(_NoiseScale != 0)
 					i.worldPos.xyz += snoise((i.worldPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
 				if (_VoroniNoiseScale != 0)
-					i.worldPos = stereoVoroniNoise(i.worldPos, axisFront, axisRight, axisUp, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize);
+					i.worldPos = stereoVoroniNoise(i.worldPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize);
 				
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
@@ -498,51 +532,8 @@
 				// Initialize color now so we can apply noise in default world-axis space
 				half4 bgcolor = half4(0, 0, 0, 0);
 
-				if (_SignalNoiseSize != 0)
-				{
-					// Only seed noise with time to allow for
-					// custom noise size via world coordinates
-					//
-					// Rotate randomly really fast to hide moire artifacts
-					// when small noise size (less than 5) is used
-					//
-					// Values chosen have no mathmatical significance, they're just arbitrary values
-					// to attempt to make it difficult to percieve any pattern in the movement
-					float3 randomAxis1 = normalize(float3(2 + gold_noise(_Time.z, _Time.y - 1),
-						-4 + 3 * gold_noise(_Time.x, _Time.x),
-						6 - 5 * gold_noise(_Time.w, _Time.z)));
-
-					// TODO: Verify if high scene times (read: sitting in worlds for 5+ hours)
-					//		 results in 'low fps' noise due to floating point inaccuracy
-					//
-					//		 Though lets be real here...even if this is an issue
-					//		 it'll likely be hidden by VRChat running at cinematic
-					//		 framerates.
-					float3 noisePos = i.worldPos.xyz;
-					noisePos.z += gold_noise(_Time.z, _Time.y) * 10000;
-					noisePos = mul(rotAxis(randomAxis1, _Time.y * 1000), noisePos);
-
-					if (_ColorizedSignalNoise != 0)
-					{
-						half4 noisecolor = half4(
-							snoise(noisePos.xyz / _SignalNoiseSize),
-							snoise(noisePos.yzx / _SignalNoiseSize),
-							snoise(noisePos.zxy / _SignalNoiseSize),
-							0);
-						noisecolor *= _SignalNoiseOpacity;
-
-						// Scale the HSV value with _ColorizedSignalNoise to allow the user
-						// to decide how much color they want in the noise.
-						half3 hsvColor = rgb2hsv(noisecolor.xyz);
-						hsvColor.y = clamp(_ColorizedSignalNoise, 0, 1);
-
-						bgcolor.rgb += hsv2rgb(hsvColor);
-					}
-					else
-					{
-						bgcolor += snoise(noisePos / _SignalNoiseSize) * _SignalNoiseOpacity;
-					}
-				}
+				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
+					bgcolor.rgb += signalNoise(i.worldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
 
 				// Shift world pos back from its current axis-aligned position to
 				// the position it should be in-front of the camera.
@@ -570,6 +561,9 @@
 					bgcolor = edgelordStripes(edgelordUV, bgcolor, _EdgelordStripeColor, _EdgelordStripeSize, _EdgelordStripeOffset);
 				}
 
+				// This feature is not in a function as it will discard the current fragment
+				// if the user has chosen to completely override the background color, and I
+				// don't want that hidden.
 				if (_MemeTexOpacity != 0)
 				{
 					float2 screenUV = (stereoPosition.xyz / stereoPosition.w).xy;
@@ -692,13 +686,7 @@
 
 				if (_Hue != 0 || _Saturation != 0 || _Value != 0)
 				{
-					half3 hsvColor = rgb2hsv(bgcolor.xyz);
-					hsvColor.x += _Hue;
-					hsvColor.y = clamp(hsvColor.y + _Saturation, 0, 1);
-
-					hsvColor.z = clamp(hsvColor.z + _Value, 0, 1);
-
-					bgcolor.xyz = hsv2rgb(hsvColor);
+					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value);
 				}
 
 				// I should probably make a function to handle this rather than copy-paste warrioring, but ¯\_(ツ)_/¯
