@@ -411,11 +411,15 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 		tex2Dproj(abberationTexture, blueAbberationPos).b, 0);
 }
 
-// Nice function wrapper that doesn't do anything because you removed all the functionality dog.
-// Function not removed since this is hilarious, and *should* be inlined by compilers™
-half4 colorShift(sampler2D colorShiftTexture, float4 grabPos)
+
+half3 colorShift(sampler2D colorShiftTexture, float3 camFront, float3 camRight, float skewAngle, float skewDistance, float opacity, float4 grabPos)
 {
-	return tex2Dproj(colorShiftTexture, grabPos);
+	grabPos = stereoMove(grabPos, camFront, camRight, skewAngle, skewDistance);
+
+	half3 color = tex2Dproj(colorShiftTexture, grabPos).xyz;
+	color *= opacity;
+
+	return color;
 }
 
 half3 signalNoise(float4 worldPos, float scale, float colorization, float opacity)

@@ -457,12 +457,15 @@
 				//		 know how many effects I will add yet, and don't want to have to
 				//		 remove parameters users are using to make space for effects.
 
+				  //////////////////////////////////////////
+				 // Apply world-space distortion effects //
+				//////////////////////////////////////////
+
 				if (_ShrinkHeight != 0)
 					i.worldPos = shrink(worldVector, axisUp, i.worldPos, _ShrinkHeight);
 				if (_ShrinkWidth != 0)
 					i.worldPos = shrink(worldVector, axisRight, i.worldPos, _ShrinkWidth);
 
-				// Apply world space effects
 				if(_RotationX != 0)
 					i.worldPos = stereoRotate(i.worldPos, axisRight, _RotationX);
 				if (_RotationY != 0)
@@ -529,7 +532,7 @@
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
 
-				// Initialize color now so we can apply noise in default world-axis space
+				// Initialize color now so we can apply signal noise in default world-axis space
 				half4 bgcolor = half4(0, 0, 0, 0);
 
 				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
@@ -543,7 +546,9 @@
 				// Finally convert world position to the stereo-correct position
 				float4 stereoPosition = computeStereoUV(i.worldPos);
 
-				// Begin applying color effects
+				  /////////////////////////
+				 // Apply color effects //
+			    /////////////////////////
 
 				// No point in sampling background color if the user is going to override it
 				// anyway.
@@ -689,31 +694,30 @@
 					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value);
 				}
 
-				// I should probably make a function to handle this rather than copy-paste warrioring, but ¯\_(ツ)_/¯
-				if (_colorSkewRDistance != 0)
+				if (_colorSkewROpacity != 0)
 				{
-					float4 redPos = stereoMove(stereoPosition, i.camFront, i.camRight, _colorSkewRAngle, _colorSkewRDistance);
-					float redColor = colorShift(_stereoCancerTexture, redPos).r * _colorSkewROpacity;
+					float redColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewRAngle, _colorSkewRDistance,
+						_colorSkewROpacity, stereoPosition).r;
 
 					if (_colorSkewROverride != 0)
 						bgcolor.r = redColor;
 					else
 						bgcolor.r += redColor;
 				}
-				if (_colorSkewGDistance != 0)
+				if (_colorSkewGOpacity != 0)
 				{
-					float4 greenPos = stereoMove(stereoPosition, i.camFront, i.camRight, _colorSkewGAngle, _colorSkewGDistance);
-					float greenColor = colorShift(_stereoCancerTexture, greenPos).g * _colorSkewGOpacity;
+					float greenColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewGAngle, _colorSkewGDistance,
+						_colorSkewGOpacity, stereoPosition).g;
 
 					if (_colorSkewGOverride != 0)
 						bgcolor.g = greenColor;
 					else
 						bgcolor.g += greenColor;
 				}
-				if (_colorSkewBDistance != 0)
+				if (_colorSkewBOpacity != 0)
 				{
-					float4 bluePos = stereoMove(stereoPosition, i.camFront, i.camRight, _colorSkewBAngle, _colorSkewBDistance);
-					float blueColor = colorShift(_stereoCancerTexture, bluePos).b * _colorSkewBOpacity;
+					float blueColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewBAngle, _colorSkewBDistance,
+						_colorSkewBOpacity, stereoPosition).b;
 
 					if (_colorSkewBOverride != 0)
 						bgcolor.b = blueColor;
