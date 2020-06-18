@@ -19,6 +19,7 @@ Warp
 Spiral  
 Fish Eye  
 Kaleidoscope  
+Glitch  
 Simplex Noise  
 Voroni Noise  
 Geometric Dither  
