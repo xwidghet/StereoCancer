@@ -694,7 +694,9 @@
 					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value);
 				}
 
-				if (_colorSkewROpacity != 0)
+				// Check opacity and override since the user may be intentionally
+				// removing the color channel.
+				if (_colorSkewROpacity != 0 || _colorSkewROverride != 0)
 				{
 					float redColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewRAngle, _colorSkewRDistance,
 						_colorSkewROpacity, stereoPosition).r;
@@ -704,7 +706,7 @@
 					else
 						bgcolor.r += redColor;
 				}
-				if (_colorSkewGOpacity != 0)
+				if (_colorSkewGOpacity != 0 || _colorSkewGOverride != 0)
 				{
 					float greenColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewGAngle, _colorSkewGDistance,
 						_colorSkewGOpacity, stereoPosition).g;
@@ -714,7 +716,7 @@
 					else
 						bgcolor.g += greenColor;
 				}
-				if (_colorSkewBOpacity != 0)
+				if (_colorSkewBOpacity != 0 || _colorSkewBOverride != 0)
 				{
 					float blueColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewBAngle, _colorSkewBDistance,
 						_colorSkewBOpacity, stereoPosition).b;
