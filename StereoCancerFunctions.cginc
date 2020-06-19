@@ -45,6 +45,63 @@ float4 computeStereoUV(float4 worldCoordinates)
 	return ComputeGrabScreenPos(screenCoords);
 }
 
+float2 screenToEyeUV(float2 screenUV)
+{
+#ifdef UNITY_SINGLE_PASS_STEREO
+	// Convert UV coordinates to eye-specific 0-1 coordiantes
+	float offset = 0.5 * step(1, unity_StereoEyeIndex);
+	float min = offset;
+	float max = 0.5 + offset;
+
+	float uvDist = max - min;
+	screenUV.x = (screenUV.x - min) / uvDist;
+#endif
+
+	return screenUV;
+}
+
+float2 EyeUVToScreen(float2 screenUV)
+{
+#ifdef UNITY_SINGLE_PASS_STEREO
+	float _offset = 0.5 * step(1, unity_StereoEyeIndex);
+	float _min = _offset;
+	float _max = 0.5 + _offset;
+
+	float _uvDist = _max - _min;
+
+	// Convert the eye-specific 0-1 coordinates back to 0-1 UV coordinates
+	screenUV.x = (screenUV.x * _uvDist) + _min;
+#endif
+
+	return screenUV;
+}
+
+float4 clampUVCoordinates(float4 stereoCoordinates)
+{
+	float2 stereoUVPos = (stereoCoordinates.xy / stereoCoordinates.w);
+
+	stereoUVPos = screenToEyeUV(stereoUVPos);
+	stereoUVPos = clamp(stereoUVPos, 0, 1);
+	stereoUVPos = EyeUVToScreen(stereoUVPos);
+
+	stereoCoordinates.xy = stereoUVPos * stereoCoordinates.w;
+
+	return stereoCoordinates;
+}
+
+float4 wrapUVCoordinates(float4 stereoCoordinates)
+{
+	float2 stereoUVPos = stereoCoordinates.xy / stereoCoordinates.w;
+
+	// Wrap around by grabbing the fractional part of the UV
+	// and convert back to stereo coordinates.
+	stereoUVPos = frac(stereoUVPos);
+
+	stereoCoordinates.xy = stereoUVPos * stereoCoordinates.w;
+
+	return stereoCoordinates;
+}
+
 float4 shrink(float3 view, float3 axis, float4 worldPos, float intensity)
 {
 	float angle = acos(dot(view, axis));

@@ -546,6 +546,20 @@
 				// Finally convert world position to the stereo-correct position
 				float4 stereoPosition = computeStereoUV(i.worldPos);
 
+				// TODO: Put _CancerPerEyeConstraint and _CancerUVWrap under an
+				//	     enum/dropdown when custom interface is implemented.
+
+				// Default UV clamping works for desktop, but for VR
+				// we may want to constrain UV coordinates to
+				// each eye.
+				//if (_CancerPerEyeConstraint != 0)
+					//stereoPosition = clampUVCoordinates(stereoPosition);
+
+				// Wrapping allows for creating 'infinite' texture
+				// and tunnel effects.
+				//if (_CancerUVWrap != 0)
+					//stereoPosition = wrapUVCoordinates(stereoPosition);
+
 				  /////////////////////////
 				 // Apply color effects //
 			    /////////////////////////
