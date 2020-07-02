@@ -153,6 +153,30 @@ float4 stereoBarY(float4 worldPos, float3 camFront, float3 camUp, float angle, f
 	return worldPos;
 }
 
+float4 stereoSinBarX(float4 worldPos, float3 camFront, float3 camRight, float angle, float interval, float offset, float distance) {
+	float flipPoint = floor(worldPos.y / interval);
+	if (angle != 0)
+		flipPoint = floor(stereoRotate(worldPos, camFront, angle).y / interval);
+
+	float dir = sin(flipPoint + offset);
+
+	worldPos.xyz += dir * camRight * distance;
+
+	return worldPos;
+}
+
+float4 stereoSinBarY(float4 worldPos, float3 camFront, float3 camUp, float angle, float interval, float offset, float distance) {
+	float flipPoint = floor(worldPos.x / interval);
+	if (angle != 0)
+		flipPoint = floor(stereoRotate(worldPos, camFront, angle).x / interval);
+
+	float dir = sin(flipPoint + offset);
+
+	worldPos.xyz += dir * camUp * distance;
+
+	return worldPos;
+}
+
 float4 stereoWarp(float4 worldPos, float3 camFront, float angle, float intensity)
 {
 	float3 rotatedPos = mul(rotAxis(normalize(camFront), angle), normalize(worldPos.xyz));
@@ -305,6 +329,32 @@ float4 stereoSinWave(float4 worldCoordinates, float3 camRight, float density, fl
 float4 stereoTanWave(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
 {
 	worldCoordinates.xyz += camRight * tan((worldCoordinates.y + offset) * density) * amplitude;
+
+	return worldCoordinates;
+}
+
+float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance)
+{
+	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), angle), worldCoordinates.xyz);
+
+	if (abs(worldCoordinates.x) <= width)
+		worldCoordinates.xyz += axis*distance;
+
+	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), -angle), worldCoordinates.xyz);
+
+	return worldCoordinates;
+}
+
+float4 stereoRipple(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset, float falloff)
+{
+	float dist = length(worldCoordinates.xy);
+
+	// Allows the user to create a water droplet effect by increasing falloff and offset
+	// together.
+	if (falloff != 0)
+		amplitude *= clamp((falloff - dist) / falloff, 0, 1);
+
+	worldCoordinates.xyz += axis * amplitude * sin(dist * density - offset);
 
 	return worldCoordinates;
 }

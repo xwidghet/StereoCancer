@@ -49,6 +49,11 @@
 
 		_CancerOpacity("Cancer Opacity", Float) = 1
 
+		// TODO: Implment UI to combine these together into one variable
+		//		 as their effects are mutually exclusive.
+		_ConstrainUVPerEye("Constrain UV Coordinates Per-Eye", Int) = 0
+		_WrapUV("Wrap UV Coordinates", Int) = 0
+
 		_ShrinkWidth("Shrink Width", Float) = 0
 		_ShrinkHeight("Shrink Height", Float) = 0
 
@@ -79,6 +84,16 @@
 		_BarYInterval("Bar Y Interval", Float) = 0
 		_BarYOffset("Bar Y Offset", Float) = 0
 
+		_SinBarXAngle("Sin Bar X Angle", Float) = 0
+		_SinBarXDistance("Sin Bar X Distance", Float) = 0
+		_SinBarXInterval("Sin Bar X Interval", Float) = 0
+		_SinBarXOffset("Sin Bar X Offset", Float) = 0
+
+		_SinBarYAngle("Sin Bar Y Angle", Float) = 0
+		_SinBarYDistance("Sin Bar Y Distance", Float) = 0
+		_SinBarYInterval("Sin Bar Y Interval", Float) = 0
+		_SinBarYOffset("Sin Bar Y Offset", Float) = 0
+
 		_ZigZagXDensity("ZigZag X Density", Float) = 0
 		_ZigZagXAmplitude("ZigZag X Amplitude", Float) = 0
 		_ZigZagXOffset("ZigZag X Offset", Float) = 0
@@ -94,6 +109,15 @@
 		_TanWaveDensity("Tan Wave Density", Float) = 0
 		_TanWaveAmplitude("Tan Wave Amplitude", Float) = 0
 		_TanWaveOffset("Tan Wave Offset", Float) = 0
+
+		_SliceAngle("Slice Angle", Float) = 0
+		_SliceWidth("Slice Width", Float) = 0
+		_SliceDistance("Slice Distance", Float) = 0
+
+		_RippleDensity("Ripple Density", Float) = 0
+		_RippleAmplitude("Ripple Amplitude", Float) = 0
+		_RippleOffset("Ripple Offset", Float) = 0
+		_RippleFalloff("Ripple Falloff", Float) = 0
 
 		_CheckerboardScale("Checkerboard Scale", Float) = 0
 		_CheckerboardShift("Checkerboard Shift Distance", Float) = 0
@@ -137,7 +161,7 @@
 		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
 		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
 		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
-
+		
 		_Hue("Hue", Float) = 0
 		_Saturation("Saturation", Float) = 0
 		_Value("Value", Float) = 0
@@ -206,6 +230,10 @@
 		Pass
 		{
 			CGPROGRAM
+			// Request Shader Model 5.0 to increase our uniform limit.
+			// VRChat runs on DirectX 11 so this should be supported by all GPUs.
+			#pragma target 5.0
+
 			#pragma vertex vert
 			#pragma fragment frag
 			
@@ -273,6 +301,16 @@
 			float _BarYInterval;
 			float _BarYOffset;
 
+			float _SinBarXAngle;
+			float _SinBarXDistance;
+			float _SinBarXInterval;
+			float _SinBarXOffset;
+
+			float _SinBarYAngle;
+			float _SinBarYDistance;
+			float _SinBarYInterval;
+			float _SinBarYOffset;
+
 			float _CheckerboardScale;
 			float _CheckerboardShift;
 			float _Quantization;
@@ -292,6 +330,15 @@
 			float _TanWaveDensity;
 			float _TanWaveAmplitude;
 			float _TanWaveOffset;
+
+			float _SliceAngle;
+			float _SliceWidth;
+			float _SliceDistance;
+
+			float _RippleDensity;
+			float _RippleAmplitude;
+			float _RippleOffset;
+			float _RippleFalloff;
 
 			float _ZigZagXDensity;
 			float _ZigZagXAmplitude;
@@ -349,6 +396,10 @@
 			float _colorSkewBAngle;
 			float _colorSkewBOpacity;
 			float _colorSkewBOverride;
+
+			// For some magic reason, these have to be down here or the shader explodes.
+			int _ConstrainUVPerEye;
+			int _WrapUV;
 
 			struct appdata
 			{
@@ -487,15 +538,26 @@
 				if (_BarYDistance != 0)
 					i.worldPos = stereoBarY(i.worldPos, axisFront, axisUp, _BarYAngle, _BarYInterval, _BarYOffset, _BarYDistance);
 
+				if (_SinBarXDistance != 0 && _SinBarXInterval != 0)
+					i.worldPos = stereoSinBarX(i.worldPos, axisFront, axisRight, _SinBarXAngle, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
+				if (_SinBarYDistance != 0 && _SinBarYInterval != 0)
+					i.worldPos = stereoSinBarY(i.worldPos, axisFront, axisUp, _SinBarYAngle, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+
 				if (_ZigZagXDensity != 0)
 					i.worldPos = stereoZigZagX(i.worldPos, axisRight, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
 				if (_ZigZagYDensity != 0)
 					i.worldPos = stereoZigZagY(i.worldPos, axisUp, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 
 				if (_SinWaveDensity != 0)
-					i.worldPos = stereoSinWave(i.worldPos, axisRight, _SinWaveDensity, _SinWaveAmplitude, _SinWaveOffset);
+					i.worldPos = stereoSinWave(i.worldPos, axisRight, _SinWaveDensity / 100 , _SinWaveAmplitude, _SinWaveOffset);
 				if (_TanWaveDensity != 0)
 					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
+
+				if (_SliceDistance != 0)
+					i.worldPos = stereoSlice(i.worldPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance);
+				
+				if (_RippleAmplitude != 0)
+					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleFalloff);
 
 				if (_CheckerboardScale != 0)
 					i.worldPos = stereoCheckerboard(i.worldPos, _CheckerboardScale, _CheckerboardShift);
@@ -546,19 +608,19 @@
 				// Finally convert world position to the stereo-correct position
 				float4 stereoPosition = computeStereoUV(i.worldPos);
 
-				// TODO: Put _CancerPerEyeConstraint and _CancerUVWrap under an
+				// TODO: Put _ConstrainUVPerEye and _WrapUV under an
 				//	     enum/dropdown when custom interface is implemented.
 
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
 				// each eye.
-				//if (_CancerPerEyeConstraint != 0)
-					//stereoPosition = clampUVCoordinates(stereoPosition);
+				if (_ConstrainUVPerEye != 0)
+					stereoPosition = clampUVCoordinates(stereoPosition);
 
 				// Wrapping allows for creating 'infinite' texture
 				// and tunnel effects.
-				//if (_CancerUVWrap != 0)
-					//stereoPosition = wrapUVCoordinates(stereoPosition);
+				if (_WrapUV != 0)
+					stereoPosition = wrapUVCoordinates(stereoPosition);
 
 				  /////////////////////////
 				 // Apply color effects //
