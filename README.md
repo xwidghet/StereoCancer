@@ -5,12 +5,13 @@ An open-source stereo-correct screen-space shader for Unity, mainly intended for
 ![](https://github.com/xwidghet/StereoCancer/blob/master/Example%20Gifs/overboard_shader.gif?raw=true)
 
 # Features (Shown above)
-Image Overlay (Blended, Tiled, Clamped, Alpha-CutOff, Override Screen)  
+Image Overlay (Blended, Tiled, Clamped, Alpha-CutOff, Override Screen & Empty Space)  
 Constrain UV Per-Eye  
 UV Wrapping  
 Shrink/Expand Width & Height  
 Rotation  
 Movement  
+Split  
 Skew  
 Bar  
 ZigZag  
