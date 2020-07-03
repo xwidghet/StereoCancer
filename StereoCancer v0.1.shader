@@ -42,12 +42,16 @@
 		// Image Effects
 		_MemeTex("Meme Image (RGB)", 2D) = "white" {}
 		_MemeTexOpacity("Meme Opacity", Float) = 0
+		_MemeTexZoom("Meme Zoom (Zoom In+/Zoom Out-)", Float) = 0
 		_MemeTexClamp("Meme Clamp", Int) = 0
 		_MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
-		_MemeTexOverride("Meme Override Background", Int) = 0
+		_MemeTexOverrideBG("Meme Override Background", Int) = 0
+		_MemeTexOverrideEmptySpace("Meme Override Empty Space", Int) = 0
 
 		_CancerOpacity("Cancer Opacity", Float) = 1
+
+		_MirrorOnly("Mirror Only", Int) = 0
 
 		// TODO: Implment UI to combine these together into one variable
 		//		 as their effects are mutually exclusive.
@@ -65,6 +69,12 @@
 		_MoveX("Move X (Left-/Right+)", Float) = 0
 		_MoveY("Move Y (Down-/Up+)", Float) = 0
 		_MoveZ("Move Z (Forward-/Back+)", Float) = 0
+
+		_SplitXDistance("Split X Distance", Float) = 0
+		_SplitXHalf("Split X Half", Float) = 0
+
+		_SplitYDistance("Split Y Distance", Float) = 0
+		_SplitYHalf("Split Y Half", Float) = 0
 
 		_SkewXDistance("Skew X Distance", Float) = 0
 		_SkewXInterval("Skew X Interval", Float) = 0
@@ -113,6 +123,7 @@
 		_SliceAngle("Slice Angle", Float) = 0
 		_SliceWidth("Slice Width", Float) = 0
 		_SliceDistance("Slice Distance", Float) = 0
+		_SliceOffset("Slice Offset", Float) = 0
 
 		_RippleDensity("Ripple Density", Float) = 0
 		_RippleAmplitude("Ripple Amplitude", Float) = 0
@@ -254,10 +265,12 @@
 			float4 _MemeTex_TexelSize;
 			float4 _MemeTex_ST;
 			float _MemeTexOpacity;
+			float _MemeTexZoom;
 			int _MemeTexClamp;
 			int _MemeTexCutOut;
 			float _MemeTexAlphaCutOff;
-			int _MemeTexOverride;
+			int _MemeTexOverrideBG;
+			int _MemeTexOverrideEmptySpace;
 
 			sampler2D _stereoCancerTexture;
 			float4 _stereoCancerTexture_TexelSize;
@@ -275,6 +288,12 @@
 			float _MoveX;
 			float _MoveY;
 			float _MoveZ;
+
+			float _SplitXDistance;
+			float _SplitXHalf;
+
+			float _SplitYDistance;
+			float _SplitYHalf;
 
 			float _SkewXDistance;
 			float _SkewXInterval;
@@ -334,6 +353,7 @@
 			float _SliceAngle;
 			float _SliceWidth;
 			float _SliceDistance;
+			float _SliceOffset;
 
 			float _RippleDensity;
 			float _RippleAmplitude;
@@ -398,6 +418,7 @@
 			float _colorSkewBOverride;
 
 			// For some magic reason, these have to be down here or the shader explodes.
+			int _MirrorOnly;
 			int _ConstrainUVPerEye;
 			int _WrapUV;
 
@@ -487,7 +508,11 @@
 				//
 				// Note: Does not contain the additional checks CancerSpace includes,
 				//		 such as Per-Eye exclusion, but is otherwise unmodified.
-				if (unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0)
+				bool isMirror = unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0;
+
+				// Allow for mirror war battles by letting the user render cancer effects
+				// only in mirrors.
+				if ((_MirrorOnly && !isMirror) || (!_MirrorOnly && isMirror) )
 				{
 					discard;
 				}
@@ -499,6 +524,9 @@
 				const float3 axisFront = float3(0, 0, -1);
 				const float3 axisRight = float3(1, 0, 0);
 				const float3 axisUp = float3(0, 1, 0);
+
+				// Allow for functions which create empty space
+				bool clearPixel = false;
 
 				// Uniforms (Shader Parameters in Unity) can be branched on to successfully
 				// avoid taking the performance hit of unused effects. This is used on every
@@ -533,6 +561,11 @@
 				if (_SkewYDistance != 0 && _SkewYInterval != 0)
 					i.worldPos = stereoSkewY(i.worldPos, axisUp, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 
+				if (_SplitXDistance != 0)
+					i.worldPos = stereoSplitX(i.worldPos, axisRight, _SplitXDistance, _SplitXHalf, clearPixel);
+				if (_SplitYDistance != 0)
+					i.worldPos = stereoSplitY(i.worldPos, axisUp, _SplitYDistance, _SplitYHalf, clearPixel);
+
 				if(_BarXDistance != 0)
 					i.worldPos = stereoBarX(i.worldPos, axisFront, axisRight, _BarXAngle, _BarXInterval, _BarXOffset, _BarXDistance);
 				if (_BarYDistance != 0)
@@ -554,7 +587,7 @@
 					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
 
 				if (_SliceDistance != 0)
-					i.worldPos = stereoSlice(i.worldPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance);
+					i.worldPos = stereoSlice(i.worldPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance, _SliceOffset);
 				
 				if (_RippleAmplitude != 0)
 					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleFalloff);
@@ -594,6 +627,11 @@
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
 
+				// Distortion effects which take the inout variable clearPixel create empty space, 
+				// so we can return now if we aren't filling the empty space.
+				if (clearPixel && _MemeTexOverrideEmptySpace == false)
+					return half4(0, 0, 0, _CancerOpacity);
+
 				// Initialize color now so we can apply signal noise in default world-axis space
 				half4 bgcolor = half4(0, 0, 0, 0);
 
@@ -602,6 +640,8 @@
 
 				// Shift world pos back from its current axis-aligned position to
 				// the position it should be in-front of the camera.
+				float4 finishedWorldPos = i.worldPos;
+
 				i.worldPos.xyz = mul(i.inverseViewMatRot, i.worldPos.xyz);
 				i.worldPos.xyz += _WorldSpaceCameraPos;
 
@@ -647,7 +687,21 @@
 				// don't want that hidden.
 				if (_MemeTexOpacity != 0)
 				{
-					float2 screenUV = (stereoPosition.xyz / stereoPosition.w).xy;
+					float4 memePosition = finishedWorldPos;
+
+					// Apply zoom to let user adjust depth
+					memePosition.xyz += axisFront * _MemeTexZoom;
+
+					// Apply tiling
+					memePosition.xy *= _MemeTex_ST.xy;
+
+					// Convert to stereo position and calculate UV coordinates.
+					memePosition.xyz = mul(i.inverseViewMatRot, memePosition.xyz);
+					memePosition.xyz += _WorldSpaceCameraPos;
+
+					memePosition = computeStereoUV(memePosition);
+
+					float2 screenUV = (memePosition.xyz / memePosition.w).xy;
 					float offset = 0;
 
 #ifdef UNITY_SINGLE_PASS_STEREO
@@ -659,7 +713,6 @@
 					float uvDist = max - min;
 					screenUV.x = (screenUV.x - min) / uvDist;
 #endif
-
 					// Shift UV to the range (-0.5, 0.5) to allow for simpler
 					// scaling math.
 					screenUV -= 0.5;
@@ -667,10 +720,6 @@
 					// Use Valve Index as standard FOV scale
 					// https://docs.google.com/spreadsheets/d/1q7Va5Q6iU40CGgewoEqRAeypUa1c0zZ86mqR8uIyDeE/edit#gid=0
 					screenUV *= getCameraFOV() / 103.6;
-
-					// Apply tiling (Scaling)
-					// Not stereo correct, must use the above Shrink Height/Shrink Width functions
-					//screenUV *= _MemeTex_ST.xy;
 
 					// Ensure the image doesn't get stretched or squished
 					// depending on the users HMD/Display aspect ratio.
@@ -680,12 +729,23 @@
 #ifdef UNITY_SINGLE_PASS_STEREO
 					// Ooga, Booga.
 					screenWidth *= 2;
-#endif
 
-					float ratioX = screenWidth / _MemeTex_TexelSize.z;
-					float ratioY = screenHeight / _MemeTex_TexelSize.w;
-					screenUV.x /= 1.0 / ratioX;
-					screenUV.y /= 1.0 / ratioY;
+					// Make image depth independent of image ratio.
+					// Todo: Figure out math to separate depth from Tiling image scaling.
+					float textureWidth = _MemeTex_TexelSize.z;
+					float constraint = ((1.0 - textureWidth / 1024.0) / 8);
+					screenUV.x -= (1 - 2*unity_StereoEyeIndex) * constraint;
+
+					if (constraint > 0)
+						screenUV *= (1.0 - constraint / 4);
+					else
+						screenUV *= (1.0 - constraint / 16);
+						
+#endif
+					float ratioX = 1.0 / (screenWidth / _MemeTex_TexelSize.z);
+					float ratioY = 1.0 / (screenHeight / _MemeTex_TexelSize.w);
+					screenUV.x /= ratioX;
+					screenUV.y /= ratioY;
 
 					// Normalize image scale with respect to Valve Index 100% SS (2016x2240)
 					//
@@ -700,7 +760,7 @@
 					screenUV += _MemeTex_ST.zw;
 
 					bool dropMemePixels = false;
-					if (_MemeTexCutOut == 1)
+					if (_MemeTexCutOut != 0)
 					{
 						// Exclude the edge pixels when doing _MemeTexCutOut
 						// to prevent bilinear sampling artifacts at the image border.
@@ -725,7 +785,7 @@
 						}
 					}
 
-					if (_MemeTexClamp == 1)
+					if (_MemeTexClamp != 0)
 					{
 						screenUV.y = clamp(screenUV.y, 0, 1);
 
@@ -752,15 +812,27 @@
 
 						if (memeColor.a > _MemeTexAlphaCutOff)
 						{
-							if (_MemeTexOverride)
-								bgcolor.rgb = memeColor*_MemeTexOpacity;
+							if (_MemeTexOverrideBG)
+							{
+								bgcolor.rgb = memeColor * _MemeTexOpacity;
+							}
+							else if (_MemeTexOverrideEmptySpace)
+							{
+								if (clearPixel)
+								{
+									bgcolor = memeColor * _MemeTexOpacity;
+									return bgcolor;
+								}
+							}
 							else
-								bgcolor += memeColor*_MemeTexOpacity;
+							{
+								bgcolor += memeColor * _MemeTexOpacity;
+							}
 						}
 					}
 					else
 					{
-						if (_MemeTexOverride)
+						if (_MemeTexOverrideBG)
 							discard;
 					}
 				}

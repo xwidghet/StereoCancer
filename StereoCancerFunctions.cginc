@@ -129,6 +129,52 @@ float4 stereoMove(float4 worldPos, float3 camFront, float3 camRight, float angle
 	return worldPos;
 }
 
+float4 stereoSplitX(float4 worldPos, float3 axis, float distance, float oneSide, inout bool clearPixel)
+{
+	if (oneSide != 0)
+	{
+		if (sign(distance) == -sign(worldPos.x))
+		{
+			if (abs(worldPos.x) < abs(distance))
+				clearPixel = true;
+			else
+				worldPos.xyz += axis * distance * -sign(worldPos.x) * sign(distance);
+		}
+	}
+	else
+	{
+		if(abs(worldPos.x) < distance)
+			clearPixel = true;
+		else
+			worldPos.xyz += axis * distance * -sign(worldPos.x);
+	}
+
+	return worldPos;
+}
+
+float4 stereoSplitY(float4 worldPos, float3 axis, float distance, float oneSide, inout bool clearPixel)
+{
+	if (oneSide != 0)
+	{
+		if (sign(distance) == -sign(worldPos.y))
+		{
+			if (abs(worldPos.y) < abs(distance))
+				clearPixel = true;
+			else
+				worldPos.xyz += axis * distance * -sign(worldPos.y) * sign(distance);
+		}
+	}
+	else
+	{
+		if (abs(worldPos.y) < distance)
+			clearPixel = true;
+		else
+			worldPos.xyz += axis * distance * -sign(worldPos.y);
+	}
+
+	return worldPos;
+}
+
 float4 stereoBarX(float4 worldPos, float3 camFront, float3 camRight, float angle, float interval, float offset, float distance) {
 	float flipPoint = worldPos.y;
 	if(angle != 0)
@@ -333,13 +379,16 @@ float4 stereoTanWave(float4 worldCoordinates, float3 camRight, float density, fl
 	return worldCoordinates;
 }
 
-float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance)
+float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance, float offset)
 {
+	
 	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), angle), worldCoordinates.xyz);
+	worldCoordinates.xyz.x += offset;
 
 	if (abs(worldCoordinates.x) <= width)
 		worldCoordinates.xyz += axis*distance;
 
+	worldCoordinates.xyz.x -= offset;
 	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), -angle), worldCoordinates.xyz);
 
 	return worldCoordinates;
