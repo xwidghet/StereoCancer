@@ -40,24 +40,22 @@
 		_ParticleSystem("Particle System", Int) = 0
 
 		// Image Effects
+		[Header(Image Overlay Effects)]
 		_MemeTex("Meme Image (RGB)", 2D) = "white" {}
 		_MemeTexOpacity("Meme Opacity", Float) = 0
 		_MemeTexZoom("Meme Zoom (Zoom In+/Zoom Out-)", Float) = 0
 		_MemeTexClamp("Meme Clamp", Int) = 0
 		_MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
-		_MemeTexOverrideBG("Meme Override Background", Int) = 0
-		_MemeTexOverrideEmptySpace("Meme Override Empty Space", Int) = 0
+		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
 
 		_CancerOpacity("Cancer Opacity", Float) = 1
 
-		_MirrorOnly("Mirror Only", Int) = 0
+		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
 
-		// TODO: Implment UI to combine these together into one variable
-		//		 as their effects are mutually exclusive.
-		_ConstrainUVPerEye("Constrain UV Coordinates Per-Eye", Int) = 0
-		_WrapUV("Wrap UV Coordinates", Int) = 0
+		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 
+		[Header(Screen Distortion Effects)]
 		_ShrinkWidth("Shrink Width", Float) = 0
 		_ShrinkHeight("Shrink Height", Float) = 0
 
@@ -169,19 +167,20 @@
 		_GeometricDitherRandomization("Geometric Dither Randomization", Float) = 0
 
 		// Screen color effects
-		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
-		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
-		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
-		
-		_Hue("Hue", Float) = 0
-		_Saturation("Saturation", Float) = 0
-		_Value("Value", Float) = 0
+		[Header(Screen Color Effects)]
+		_SignalNoiseSize("Signal Noise Size", Float) = 0
+		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
+		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
 
 		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
 
-		_SignalNoiseSize("Signal Noise Size", Float) = 0
-		_ColorizedSignalNoise("Colorized Signal Noise", Float) = 0
-		_SignalNoiseOpacity("Signal Noise opacity", Float) = 0
+		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
+		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
+		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
+
+		_Hue("Hue", Float) = 0
+		_Saturation("Saturation", Float) = 0
+		_Value("Value", Float) = 0
 
 		_colorSkewRDistance("Red Move Distance", Float) = 0
 		_colorSkewRAngle("Red Move Angle", Float) = 0
@@ -269,8 +268,7 @@
 			int _MemeTexClamp;
 			int _MemeTexCutOut;
 			float _MemeTexAlphaCutOff;
-			int _MemeTexOverrideBG;
-			int _MemeTexOverrideEmptySpace;
+			float _MemeTexOverrideMode;
 
 			sampler2D _stereoCancerTexture;
 			float4 _stereoCancerTexture_TexelSize;
@@ -418,9 +416,8 @@
 			float _colorSkewBOverride;
 
 			// For some magic reason, these have to be down here or the shader explodes.
-			int _MirrorOnly;
-			int _ConstrainUVPerEye;
-			int _WrapUV;
+			float _CancerDisplayMode;
+			float _ScreenSamplingMode;
 
 			struct appdata
 			{
@@ -512,7 +509,7 @@
 
 				// Allow for mirror war battles by letting the user render cancer effects
 				// only in mirrors.
-				if ((_MirrorOnly && !isMirror) || (!_MirrorOnly && isMirror) )
+				if ((_CancerDisplayMode == 1 && !isMirror) || (_CancerDisplayMode == 0 && isMirror) )
 				{
 					discard;
 				}
@@ -628,8 +625,8 @@
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
 
 				// Distortion effects which take the inout variable clearPixel create empty space, 
-				// so we can return now if we aren't filling the empty space.
-				if (clearPixel && _MemeTexOverrideEmptySpace == false)
+				// so we can return now if we aren't filling the empty space (Override mode 2).
+				if (clearPixel && _MemeTexOverrideMode != 2)
 					return half4(0, 0, 0, _CancerOpacity);
 
 				// Initialize color now so we can apply signal noise in default world-axis space
@@ -648,18 +645,15 @@
 				// Finally convert world position to the stereo-correct position
 				float4 stereoPosition = computeStereoUV(i.worldPos);
 
-				// TODO: Put _ConstrainUVPerEye and _WrapUV under an
-				//	     enum/dropdown when custom interface is implemented.
-
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
 				// each eye.
-				if (_ConstrainUVPerEye != 0)
+				if (_ScreenSamplingMode == 1)
 					stereoPosition = clampUVCoordinates(stereoPosition);
 
 				// Wrapping allows for creating 'infinite' texture
 				// and tunnel effects.
-				if (_WrapUV != 0)
+				if (_ScreenSamplingMode == 2)
 					stereoPosition = wrapUVCoordinates(stereoPosition);
 
 				  /////////////////////////
@@ -812,11 +806,13 @@
 
 						if (memeColor.a > _MemeTexAlphaCutOff)
 						{
-							if (_MemeTexOverrideBG)
+							// Override Background
+							if (_MemeTexOverrideMode == 1)
 							{
 								bgcolor.rgb = memeColor * _MemeTexOpacity;
 							}
-							else if (_MemeTexOverrideEmptySpace)
+							// Override Empty Space
+							else if (_MemeTexOverrideMode == 2)
 							{
 								if (clearPixel)
 								{
@@ -832,7 +828,8 @@
 					}
 					else
 					{
-						if (_MemeTexOverrideBG)
+						// Override Background
+						if (_MemeTexOverrideMode == 1)
 							discard;
 					}
 				}
