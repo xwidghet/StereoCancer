@@ -635,4 +635,22 @@ half3 applyHSV(half4 bgcolor, float hue, float saturation, float value)
 	return hsv2rgb(hsvColor);
 }
 
+// This function isn't very good, but it's good enough for now
+// as it does generate a similar effect to what I'm going for.
+half3 imaginaryColors(float3 worldVector, float angle)
+{
+#ifdef UNITY_SINGLE_PASS_STEREO
+	// Flip the color wheel for the other eye to generate 'imaginary' colors
+	angle += (UNITY_PI/2) * step(1, unity_StereoEyeIndex);
+#endif
+
+	worldVector = mul(rotAxis(float3(0, 0, 1), angle), worldVector);
+
+	// Don't worry about it :>)
+	worldVector.xyz *= worldVector.zxy;
+	worldVector *= 1.0/rcp(worldVector);
+
+	return worldVector.xyz;
+}
+
 #endif

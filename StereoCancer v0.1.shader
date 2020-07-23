@@ -23,7 +23,7 @@
 	//			which is licensed under the MIT License.
 	//			https://opensource.org/licenses/MIT
 	//
-	//			This shader also makes use of the voroni noise generator created by Ronja Böhringer,
+	//			This shader also makes use of the voroni noise generator created by Ronja Bohringer,
 	//			which is licensed under the CC-BY 4.0 license (https://creativecommons.org/licenses/by/4.0/)
 	//			https://github.com/ronja-tutorials/ShaderTutorials
 	//
@@ -36,7 +36,12 @@
 
 	Properties
 	{
-		// Particle System parameters
+		[Header(Rendering Parameters)]
+		_CancerOpacity("Cancer Opacity", Float) = 1
+		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
+		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
+		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
+
 		_ParticleSystem("Particle System", Int) = 0
 
 		// Image Effects
@@ -48,12 +53,6 @@
 		_MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
-
-		_CancerOpacity("Cancer Opacity", Float) = 1
-
-		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
-
-		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 
 		[Header(Screen Distortion Effects)]
 		_ShrinkWidth("Shrink Width", Float) = 0
@@ -182,6 +181,10 @@
 		_Saturation("Saturation", Float) = 0
 		_Value("Value", Float) = 0
 
+		[Enum(Multiply, 0, Add, 1, MulAdd, 2)] _ImaginaryColorBlendMode("Imaginary Color Blend Mode", Float) = 2
+		_ImaginaryColorOpacity("Imaginary Color Opacity", Float) = 0
+		_ImaginaryColorAngle("Imaginary Color Angle", Float) = 0
+
 		_colorSkewRDistance("Red Move Distance", Float) = 0
 		_colorSkewRAngle("Red Move Angle", Float) = 0
 		_colorSkewROpacity("Red Move Opacity", Float) = 0
@@ -259,6 +262,7 @@
 			#include "StereoCancerFunctions.cginc"
 			
 			int _ParticleSystem;
+			float _Visibility;
 			
 			sampler2D _MemeTex;
 			float4 _MemeTex_TexelSize;
@@ -394,6 +398,10 @@
 			float _Saturation;
 			float _Value;
 
+			float _ImaginaryColorBlendMode;
+			float _ImaginaryColorOpacity;
+			float _ImaginaryColorAngle;
+
 			float _ChromaticAbberationStrength;
 
 			float _SignalNoiseSize;
@@ -484,7 +492,9 @@
 				// Hey, remember that comment above about saving insignificant amounts
 				// of performance...?
 				o.worldPos = float4(mul(o.inverseViewMatRot, v.vertex), 1);
-				o.worldPos.xyz += _WorldSpaceCameraPos;
+
+				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
+				o.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
 
 				o.pos = mul(UNITY_MATRIX_VP, o.worldPos);
 
@@ -493,6 +503,28 @@
 				// This makes it easy to write effects as the coordinates
 				// are all on a 2D XY plane, 100 units away from the camera.
 				o.worldPos.xyz = v.vertex.xyz;
+
+				// If visiblity isn't global...
+				if (_Visibility > 0)
+				{
+					// Assumes the following:
+					// Object is parented to the head
+					// Object has a scale of 10,000 in all axes.
+					//
+					// Note: I have no idea why this has to be backwards. It should be
+					//		 smaller when it IS the user, not when it's others as the
+					//		 user's head scale is multiplied by 0.0001.
+
+					// Check if the Y scale has been scaled.
+					bool isOther = length(float3(UNITY_MATRIX_M[1][0], UNITY_MATRIX_M[1][1], UNITY_MATRIX_M[1][2])) <= 10;
+					
+					// Self Only
+					if (_Visibility == 1 && (isOther == false))
+						o.pos = float4(9999, 9999, 9999, 9999);
+					// Others Only...I'm so sorry.
+					else if (_Visibility == 2 && (isOther == true))
+						o.pos = float4(9999, 9999, 9999, 9999);
+				}
 				
 				return o;
 			}
@@ -640,7 +672,9 @@
 				float4 finishedWorldPos = i.worldPos;
 
 				i.worldPos.xyz = mul(i.inverseViewMatRot, i.worldPos.xyz);
-				i.worldPos.xyz += _WorldSpaceCameraPos;
+
+				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
+				i.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
 
 				// Finally convert world position to the stereo-correct position
 				float4 stereoPosition = computeStereoUV(i.worldPos);
@@ -835,8 +869,18 @@
 				}
 
 				if (_Hue != 0 || _Saturation != 0 || _Value != 0)
-				{
 					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value);
+
+				if (_ImaginaryColorOpacity != 0)
+				{
+					half3 imaginaryColor = imaginaryColors(worldVector, _ImaginaryColorAngle)*_ImaginaryColorOpacity;
+					
+					if (_ImaginaryColorBlendMode == 0)
+						bgcolor.rgb *= imaginaryColor;
+					else if (_ImaginaryColorBlendMode == 1)
+						bgcolor.rgb += imaginaryColor;
+					else if (_ImaginaryColorBlendMode == 2)
+						bgcolor.rgb += bgcolor.rgb*imaginaryColor;
 				}
 
 				// Check opacity and override since the user may be intentionally
