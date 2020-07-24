@@ -12,7 +12,7 @@
 	// directly, to allow for combining them together to create more powerful effects
 	// without copy-pasting code. 
 	//
-	// ex. Geometric Dither is created by using SkewX and SkewY repeatedly with varying parameter values
+	// ex. Geometric Dither is created by using Skew repeatedly with varying parameter values
 	//
 	// LICENSE: This shader is licensed under GPL V3 as it makes usage of
 	//			CancerSpace's mirror check which inherently means this must be
@@ -579,33 +579,57 @@
 					i.worldPos = stereoRotate(i.worldPos, axisFront, _RotationZ);
 
 				i.worldPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
-				
+
 				// At interval of 0 the screen will be blank,
 				// so we must check both distance and interval
 				if(_SkewXDistance != 0 && _SkewXInterval != 0)
-					i.worldPos = stereoSkewX(i.worldPos, axisRight, _SkewXInterval, _SkewXDistance, _SkewXOffset);
+					i.worldPos = stereoSkew(i.worldPos, axisRight, i.worldPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
 				if (_SkewYDistance != 0 && _SkewYInterval != 0)
-					i.worldPos = stereoSkewY(i.worldPos, axisUp, _SkewYInterval, _SkewYDistance, _SkewYOffset);
+					i.worldPos = stereoSkew(i.worldPos, axisUp, i.worldPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 
 				if (_SplitXDistance != 0)
-					i.worldPos = stereoSplitX(i.worldPos, axisRight, _SplitXDistance, _SplitXHalf, clearPixel);
+					i.worldPos = stereoSplit(i.worldPos, axisRight, i.worldPos.x, _SplitXDistance, _SplitXHalf, clearPixel);
 				if (_SplitYDistance != 0)
-					i.worldPos = stereoSplitY(i.worldPos, axisUp, _SplitYDistance, _SplitYHalf, clearPixel);
+					i.worldPos = stereoSplit(i.worldPos, axisUp, i.worldPos.y, _SplitYDistance, _SplitYHalf, clearPixel);
 
-				if(_BarXDistance != 0)
-					i.worldPos = stereoBarX(i.worldPos, axisFront, axisRight, _BarXAngle, _BarXInterval, _BarXOffset, _BarXDistance);
+				if (_BarXDistance != 0)
+				{
+					float flipPoint = i.worldPos.y;
+					if (_BarXAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, i.camFront, _BarXAngle).y;
+
+					i.worldPos = stereoBar(i.worldPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
+				}
 				if (_BarYDistance != 0)
-					i.worldPos = stereoBarY(i.worldPos, axisFront, axisUp, _BarYAngle, _BarYInterval, _BarYOffset, _BarYDistance);
+				{
+					float flipPoint = i.worldPos.x;
+					if (_BarYAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, i.camFront, _BarYAngle).x;
+
+					i.worldPos = stereoBar(i.worldPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
+				}
 
 				if (_SinBarXDistance != 0 && _SinBarXInterval != 0)
-					i.worldPos = stereoSinBarX(i.worldPos, axisFront, axisRight, _SinBarXAngle, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
+				{
+					float flipPoint = i.worldPos.y;
+					if (_SinBarXAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, i.camFront, _SinBarXAngle).y;
+
+					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
+				}
 				if (_SinBarYDistance != 0 && _SinBarYInterval != 0)
-					i.worldPos = stereoSinBarY(i.worldPos, axisFront, axisUp, _SinBarYAngle, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+				{
+					float flipPoint = i.worldPos.x;
+					if (_SinBarYAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, i.camFront, _SinBarYAngle).x;
+
+					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+				}
 
 				if (_ZigZagXDensity != 0)
-					i.worldPos = stereoZigZagX(i.worldPos, axisRight, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
+					i.worldPos = stereoZigZag(i.worldPos, axisRight, i.worldPos.y, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
 				if (_ZigZagYDensity != 0)
-					i.worldPos = stereoZigZagY(i.worldPos, axisUp, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
+					i.worldPos = stereoZigZag(i.worldPos, axisUp, i.worldPos.x, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 
 				if (_SinWaveDensity != 0)
 					i.worldPos = stereoSinWave(i.worldPos, axisRight, _SinWaveDensity / 100 , _SinWaveAmplitude, _SinWaveOffset);

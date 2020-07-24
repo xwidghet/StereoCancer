@@ -129,96 +129,44 @@ float4 stereoMove(float4 worldPos, float3 camFront, float3 camRight, float angle
 	return worldPos;
 }
 
-float4 stereoSplitX(float4 worldPos, float3 axis, float distance, float oneSide, inout bool clearPixel)
+float4 stereoSplit(float4 worldPos, float3 axis, float splitPoint, float distance, float oneSide, inout bool clearPixel)
 {
 	if (oneSide != 0)
 	{
-		if (sign(distance) == -sign(worldPos.x))
+		if (sign(distance) == -sign(splitPoint))
 		{
 			if (abs(worldPos.x) < abs(distance))
 				clearPixel = true;
 			else
-				worldPos.xyz += axis * distance * -sign(worldPos.x) * sign(distance);
+				worldPos.xyz += axis * distance * -sign(splitPoint) * sign(distance);
 		}
 	}
 	else
 	{
-		if(abs(worldPos.x) < distance)
+		if (abs(splitPoint) < distance)
 			clearPixel = true;
 		else
-			worldPos.xyz += axis * distance * -sign(worldPos.x);
+			worldPos.xyz += axis * distance * -sign(splitPoint);
 	}
 
 	return worldPos;
 }
 
-float4 stereoSplitY(float4 worldPos, float3 axis, float distance, float oneSide, inout bool clearPixel)
+float4 stereoBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
-	if (oneSide != 0)
-	{
-		if (sign(distance) == -sign(worldPos.y))
-		{
-			if (abs(worldPos.y) < abs(distance))
-				clearPixel = true;
-			else
-				worldPos.xyz += axis * distance * -sign(worldPos.y) * sign(distance);
-		}
-	}
-	else
-	{
-		if (abs(worldPos.y) < distance)
-			clearPixel = true;
-		else
-			worldPos.xyz += axis * distance * -sign(worldPos.y);
-	}
-
-	return worldPos;
-}
-
-float4 stereoBarX(float4 worldPos, float3 camFront, float3 camRight, float angle, float interval, float offset, float distance) {
-	float flipPoint = worldPos.y;
-	if(angle != 0)
-		flipPoint = stereoRotate(worldPos, camFront, angle).y;
-
-	float dir = fmod(abs(flipPoint) + interval / 2 + offset, interval*2) < interval ? -1 : 1;
-
-	worldPos.xyz += dir * camRight * distance;
-
-	return worldPos;
-}
-
-float4 stereoBarY(float4 worldPos, float3 camFront, float3 camUp, float angle, float interval, float offset, float distance) {
-	float flipPoint = worldPos.x;
-	if (angle != 0)
-		flipPoint = stereoRotate(worldPos, camFront, angle).x;
-
 	float dir = fmod(abs(flipPoint) + interval / 2 + offset, interval * 2) < interval ? -1 : 1;
 
-	worldPos.xyz += dir * camUp * distance;
+	worldPos.xyz += dir * moveAxis * distance;
 
 	return worldPos;
 }
 
-float4 stereoSinBarX(float4 worldPos, float3 camFront, float3 camRight, float angle, float interval, float offset, float distance) {
-	float flipPoint = floor(worldPos.y / interval);
-	if (angle != 0)
-		flipPoint = floor(stereoRotate(worldPos, camFront, angle).y / interval);
-
+float4 stereoSinBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance) 
+{
+	flipPoint = floor(flipPoint / interval);
 	float dir = sin(flipPoint + offset);
 
-	worldPos.xyz += dir * camRight * distance;
-
-	return worldPos;
-}
-
-float4 stereoSinBarY(float4 worldPos, float3 camFront, float3 camUp, float angle, float interval, float offset, float distance) {
-	float flipPoint = floor(worldPos.x / interval);
-	if (angle != 0)
-		flipPoint = floor(stereoRotate(worldPos, camFront, angle).x / interval);
-
-	float dir = sin(flipPoint + offset);
-
-	worldPos.xyz += dir * camUp * distance;
+	worldPos.xyz += dir * moveAxis * distance;
 
 	return worldPos;
 }
@@ -242,32 +190,17 @@ float4 stereoZoom(float4 worldCoordinates, float3 camFront, float distance)
 	return ComputeGrabScreenPos(screenCoords);
 }
 
-float4 stereoSkewX(float4 worldCoordinates, float3 camRight, float interval, float distance, float offset)
+float4 stereoSkew(float4 worldCoordinates, float3 moveAxis, float flipPoint, float interval, float distance, float offset)
 {
-	float intPosY = floor(abs(worldCoordinates.y));
+	float intPosY = floor(abs(flipPoint));
 	float skewDir = -1 + 2 * step(1, (intPosY % 2));
 
-	float skewVal = fmod(abs(worldCoordinates.y + offset), interval) / interval - 0.5;
+	float skewVal = fmod(abs(flipPoint + offset), interval) / interval - 0.5;
 	skewVal *= skewDir;
 
 	skewVal *= distance;
 
-	worldCoordinates.xyz += camRight * skewVal;
-
-	return worldCoordinates;
-}
-
-float4 stereoSkewY(float4 worldCoordinates, float3 camUp, float interval, float distance, float offset)
-{
-	float intPosX = floor(abs(worldCoordinates.x));
-	float skewDir = -1 + 2 * step(1, (intPosX % 2));
-
-	float skewVal = fmod(abs(worldCoordinates.x + offset), interval) / interval - 0.5;
-	skewVal *= skewDir;
-
-	skewVal *= distance;
-
-	worldCoordinates.xyz += camUp * skewVal;
+	worldCoordinates.xyz += moveAxis * skewVal;
 
 	return worldCoordinates;
 }
@@ -290,11 +223,11 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 	const float ditherInterval = 1;
 	for (int i = 0; i < quality; i++)
 	{
-		worldCoordinates = stereoSkewX(worldCoordinates, camRight, ditherInterval, distance, offset);
-		worldCoordinates = stereoSkewY(worldCoordinates, camUp, ditherInterval, distance, offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, distance, offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, distance, offset);
 
-		worldCoordinates = stereoSkewX(worldCoordinates, camRight, -ditherInterval, -distance, -offset);
-		worldCoordinates = stereoSkewY(worldCoordinates, camUp, -ditherInterval, -distance, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, -ditherInterval, -distance, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, -ditherInterval, -distance, -offset);
 	}
 
 	return worldCoordinates / 10;
@@ -408,28 +341,15 @@ float4 stereoRipple(float4 worldCoordinates, float3 axis, float density, float a
 	return worldCoordinates;
 }
 
-float4 stereoZigZagX(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
+float4 stereoZigZag(float4 worldCoordinates, float3 moveAxis, float flipPoint, float density, float amplitude, float offset)
 {
-	float effectVal = (worldCoordinates.y / density + offset);
+	float effectVal = (flipPoint / density + offset);
 	effectVal = fmod(abs(effectVal), 2.0);
 
 	if (effectVal > 1)
 		effectVal = 2.0 - effectVal;
 
-	worldCoordinates.xyz += camRight * tpdf(effectVal) * amplitude;
-
-	return worldCoordinates;
-}
-
-float4 stereoZigZagY(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
-{
-	float effectVal = (worldCoordinates.x / density + offset);
-	effectVal = fmod(abs(effectVal), 2.0);
-
-	if (effectVal > 1)
-		effectVal = 2.0 - effectVal;
-
-	worldCoordinates.xyz += camRight * tpdf(effectVal) * amplitude;
+	worldCoordinates.xyz += moveAxis * tpdf(effectVal) * amplitude;
 
 	return worldCoordinates;
 }
