@@ -510,19 +510,16 @@
 					// Assumes the following:
 					// Object is parented to the head
 					// Object has a scale of 10,000 in all axes.
-					//
-					// Note: I have no idea why this has to be backwards. It should be
-					//		 smaller when it IS the user, not when it's others as the
-					//		 user's head scale is multiplied by 0.0001.
 
-					// Check if the Y scale has been scaled.
-					bool isOther = length(float3(UNITY_MATRIX_M[1][0], UNITY_MATRIX_M[1][1], UNITY_MATRIX_M[1][2])) <= 10;
+					// If the Y scale hasn't been multiplied by 0.0001 then it is not the user of the avatar
+					// (or their viewball has drifted far away from their head).
+					bool isOther = length(float3(UNITY_MATRIX_M[1][0], UNITY_MATRIX_M[1][1], UNITY_MATRIX_M[1][2])) >= 10;
 					
 					// Self Only
-					if (_Visibility == 1 && (isOther == false))
+					if (_Visibility == 1 && (isOther == true))
 						o.pos = float4(9999, 9999, 9999, 9999);
 					// Others Only...I'm so sorry.
-					else if (_Visibility == 2 && (isOther == true))
+					else if (_Visibility == 2 && (isOther == false))
 						o.pos = float4(9999, 9999, 9999, 9999);
 				}
 				
