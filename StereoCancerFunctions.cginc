@@ -135,7 +135,7 @@ float4 stereoSplit(float4 worldPos, float3 axis, float splitPoint, float distanc
 	{
 		if (sign(distance) == -sign(splitPoint))
 		{
-			if (abs(worldPos.x) < abs(distance))
+			if (abs(splitPoint) < abs(distance))
 				clearPixel = true;
 			else
 				worldPos.xyz += axis * distance * -sign(splitPoint) * sign(distance);
@@ -354,6 +354,35 @@ float4 stereoZigZag(float4 worldCoordinates, float3 moveAxis, float flipPoint, f
 	return worldCoordinates;
 }
 
+float4 stereoBlockDisplacement(float4 worldCoordinates, float blockSize, float intensity, float displacementMode, float seed, inout bool clearPixel)
+{
+	// HACK: snoise is not continous at exact intervals of 1, so I skip
+	//		 over the issue with an imperceptible jump.
+	seed = seed == 0 ? 0.001 : seed;
+
+	float seedCheck = fmod(seed, 10);
+	if (seedCheck <= 0.001)
+		seed += sign(seed)*0.0001;
+	else if (seedCheck >= 9.999)
+		seed -= sign(seed)*0.0001;
+
+	// Add 0.5 to make the center of the screen in a block rather than
+	// the corner between blocks
+	float2 block = floor(worldCoordinates.xy / blockSize + 0.5);
+	float2 scale = float2(0, 0);
+
+	if (displacementMode == 0)
+		scale = float2(snoise(float3(block, seed / 10)), snoise(float3(block, -seed / 10)))*0.5 + 0.5;
+	else
+		scale = float2(rand2dTo1d(block + seed), rand2dTo1d(block - seed));
+
+	scale *= blockSize;
+
+	worldCoordinates.xy += (scale - blockSize / 2)*intensity;
+
+	return worldCoordinates;
+}
+
 float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, float3 camUp, int glitchCount,
 	float maxGlitchWidth, float maxGlitchHeight, float glitchIntensity, float seed,
 	float seedInterval)
@@ -419,7 +448,7 @@ float4 stereoKaleidoscope(float4 worldCoordinates, float3 camFront, float angle,
 
 // This effect is pretty performance heavy in VR, so I may need to implement something which creates
 // the same effect without requiring calculating 3D voroni noise
-float4 stereoVoroniNoise(float4 worldCoordinates, float scale, float offset, float strength, float borderSize)
+float4 stereoVoroniNoise(float4 worldCoordinates, float scale, float offset, float strength, float borderSize, float borderMode, float borderStrength, inout bool clearPixel)
 {
 	float3 samplePoint = worldCoordinates.xyz / scale;
 	samplePoint.z += offset / 10;
@@ -429,16 +458,45 @@ float4 stereoVoroniNoise(float4 worldCoordinates, float scale, float offset, flo
 
 	// Turn what would normally be used for color into a directional vector
 	float3 cellVector = normalize(rand1dTo3d(vNoise.y) - 0.5);
-	cellVector *= strength;
 
-	// Disable voroni distortion inside the borders
 	if (borderSize != 0)
 	{
 		float valueChange = fwidth(samplePoint.z) * borderSize;
 		float halfSize = borderSize / 2;
 
 		float isBorder = 1 - smoothstep(halfSize - valueChange, halfSize + valueChange, vNoise.z);
-		cellVector = lerp(cellVector, float3(0, 0, 0), isBorder);
+
+		// No Effect
+		if (borderMode == 0)
+		{
+			cellVector *= strength;
+			cellVector = lerp(cellVector, float3(0, 0, 0), isBorder);
+		}
+		// Multiply
+		else if (borderMode == 1)
+		{
+			if (isBorder > 0.001)
+			{
+				isBorder *= borderStrength;
+				cellVector = lerp(cellVector, float3(0, 0, 0), isBorder);
+			}
+			else
+			{
+				cellVector *= strength;
+			}
+		}
+		// Empty Space
+		else
+		{
+			if (isBorder > 0.5)
+				clearPixel = true;
+
+			cellVector *= strength;
+		}
+	}
+	else
+	{
+		cellVector *= strength;
 	}
 
 	worldCoordinates.xyz += cellVector;

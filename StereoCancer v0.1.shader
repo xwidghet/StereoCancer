@@ -145,6 +145,11 @@
 		_KaleidoscopeSegments("Kaleidoscope Segments", Range(0,32)) = 0
 		_KaleidoscopeAngle("Kaleidoscope Angle", Float) = 0
 
+		_BlockDisplacementSize("Block Displacement Size", Float) = 0
+		_BlockDisplacementIntensity("Block Displacement Intensity", Float) = 0
+		[Enum(Smooth, 0, Random, 1)] _BlockDisplacementMode("Block Displacement Mode", Float) = 0
+		_BlockDisplacementOffset("Block Displacement Offset", Float) = 0
+
 		_GlitchCount("Glitch Count", Range(0, 32)) = 0
 		_MaxGlitchWidth("Max Glitch Width", Float) = 0
 		_MaxGlitchHeight("Max Glitch Height", Float) = 0
@@ -159,6 +164,8 @@
 		_VoroniNoiseScale("Voroni Noise Scale", Float) = 0
 		_VoroniNoiseStrength("Voroni Noise Strength", Float) = 0
 		_VoroniNoiseBorderSize("Voroni Border Size", Float) = 0
+		[Enum(NoEffect,0, Multiply,1, EmptySpace, 2)] _VoroniNoiseBorderMode("Voroni Border Mode", Float) = 0
+		_VoroniNoiseBorderStrength("Voroni Noise Border Strength", Float) = 1
 		_VoroniNoiseOffset("Voroni Noise Offset", Float) = 0
 
 		_GeometricDitherDistance("Geometric Dither Distance", Float) = 0
@@ -373,6 +380,11 @@
 			float _KaleidoscopeSegments;
 			float _KaleidoscopeAngle;
 
+			float _BlockDisplacementSize;
+			float _BlockDisplacementIntensity;
+			float _BlockDisplacementMode;
+			float _BlockDisplacementOffset;
+
 			float _GlitchCount;
 			float _MaxGlitchWidth;
 			float _MaxGlitchHeight;
@@ -387,6 +399,8 @@
 			float _VoroniNoiseScale;
 			float _VoroniNoiseStrength;
 			float _VoroniNoiseBorderSize;
+			float _VoroniNoiseBorderMode;
+			float _VoroniNoiseBorderStrength;
 			float _VoroniNoiseOffset;
 
 			// Screen color params
@@ -433,9 +447,7 @@
 				float3 normal : NORMAL;
 
 				// For getting particle position and scale
-				// Scale currently unimplemented
 				float4 uv : TEXCOORD0;
-				float4 uv2 : TEXCOORD1;
 			};
 
 			struct v2f
@@ -465,14 +477,20 @@
 				// It subtracts where it is, from where it isn't,
 				// to move vertices to where they wasn't.
 				//
-				// Usage: This expects that the user has enabled Center output
-				//		  under Custom Vertex Streams in their particle system renderer.
+				// Usage: Set the following Renderer settings for the particle system
+				//		  Render Alignment: World
+				//		  Custom Vertex Streams:
+				//				Position (POSITION.xyz)
+				//				Center   (TEXCOORD0.xyz)
+				//				Size.x   (TEXCOORD0.w)
 				if (_ParticleSystem == 1)
 				{
-					// TODO: Add particle size support and rotation negation. The current implementation
-					//		 will result in particles with a size greater than 10 being Z-culled in a lot of worlds.
+					// Move particle back to the coordinates (0,0,0)
+					// and remove scaling.
 					float3 particleSystemOrigin = v.uv.xyz;
 					v.vertex.xyz -= particleSystemOrigin;
+
+					v.vertex.xyz *= rcp(v.uv.w);
 				}
 				
 				// Scale the shape so that the user isn't able to see the sides
@@ -663,16 +681,20 @@
 				if(_KaleidoscopeSegments > 0)
 					i.worldPos = stereoKaleidoscope(i.worldPos, axisFront, _KaleidoscopeAngle, _KaleidoscopeSegments);
 
+				if (_BlockDisplacementSize != 0)
+					i.worldPos = stereoBlockDisplacement(i.worldPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
+
 				// Think you have enough function parameters there buddy?
 				if (_GlitchCount != 0 && _GlitchIntensity != 0)
 					i.worldPos = stereoGlitch(i.worldPos, axisFront, axisRight, axisUp,
 						_GlitchCount, _MaxGlitchWidth, _MaxGlitchHeight, _GlitchIntensity,
 						_GlitchSeed, _GlitchSeedInterval);
 
-				if(_NoiseScale != 0)
+				if(_NoiseScale != 0 && _NoiseStrength != 0)
 					i.worldPos.xyz += snoise((i.worldPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
-				if (_VoroniNoiseScale != 0)
-					i.worldPos = stereoVoroniNoise(i.worldPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize);
+				if (_VoroniNoiseScale != 0 && (_VoroniNoiseStrength != 0 || _VoroniNoiseBorderStrength != 0))
+					i.worldPos = stereoVoroniNoise(i.worldPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
+					
 				
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
