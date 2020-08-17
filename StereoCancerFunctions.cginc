@@ -233,9 +233,14 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 	return worldCoordinates / 10;
 }
 
-float4 stereoCheckerboard(float4 coordinates, float scale, float shiftDistance)
+float4 stereoCheckerboard(float4 coordinates, float3 axis, float angle, float scale, float shiftDistance)
 {
-	float2 intPos = floor(coordinates.xy / scale + 0.5);
+	float4 localCoordinates = coordinates;
+	
+	if (angle != 0)
+		localCoordinates = stereoRotate(localCoordinates, axis, angle);
+
+	float2 intPos = floor(localCoordinates.xy / scale + 0.5);
 
 	float offset = 1 + -2 * step(1, (abs(intPos.y) % 2));
 	float dir = 1 + -2 * step(1, (abs(intPos.x) % 2));

@@ -67,16 +67,20 @@
 		_MoveY("Move Y (Down-/Up+)", Float) = 0
 		_MoveZ("Move Z (Forward-/Back+)", Float) = 0
 
+		_SplitXAngle("Split X Angle", Float) = 0
 		_SplitXDistance("Split X Distance", Float) = 0
 		_SplitXHalf("Split X Half", Float) = 0
 
+		_SplitYAngle("Split Y Angle", Float) = 0
 		_SplitYDistance("Split Y Distance", Float) = 0
 		_SplitYHalf("Split Y Half", Float) = 0
 
+		_SkewXAngle("Skew X Angle", Float) = 0
 		_SkewXDistance("Skew X Distance", Float) = 0
 		_SkewXInterval("Skew X Interval", Float) = 0
 		_SkewXOffset("Skew X Offset", Float) = 0
 
+		_SkewYAngle("Skew Y Angle", Float) = 0
 		_SkewYDistance("Skew Y Distance", Float) = 0
 		_SkewYInterval("Skew Y Interval", Float) = 0
 		_SkewYOffset("Skew Y Offset", Float) = 0
@@ -101,18 +105,22 @@
 		_SinBarYInterval("Sin Bar Y Interval", Float) = 0
 		_SinBarYOffset("Sin Bar Y Offset", Float) = 0
 
+		_ZigZagXAngle("ZigZag X Angle", Float) = 0
 		_ZigZagXDensity("ZigZag X Density", Float) = 0
 		_ZigZagXAmplitude("ZigZag X Amplitude", Float) = 0
 		_ZigZagXOffset("ZigZag X Offset", Float) = 0
 
+		_ZigZagYAngle("ZigZag Y Angle", Float) = 0
 		_ZigZagYDensity("ZigZag Y Density", Float) = 0
 		_ZigZagYAmplitude("ZigZag Y Amplitude", Float) = 0
 		_ZigZagYOffset("ZigZag Y Offset", Float) = 0
 
+		_SinWaveAngle("Sin Wave Angle", Float) = 0
 		_SinWaveDensity("Sin Wave Density", Float) = 0
 		_SinWaveAmplitude("Sin Wave Amplitude", Float) = 0
 		_SinWaveOffset("Sin Wave Offset", Float) = 0
 
+		_TanWaveAngle("Tan Wave Angle", Float) = 0
 		_TanWaveDensity("Tan Wave Density", Float) = 0
 		_TanWaveAmplitude("Tan Wave Amplitude", Float) = 0
 		_TanWaveOffset("Tan Wave Offset", Float) = 0
@@ -127,6 +135,7 @@
 		_RippleOffset("Ripple Offset", Float) = 0
 		_RippleFalloff("Ripple Falloff", Float) = 0
 
+		_CheckerboardAngle("Checkerboard Angle", Float) = 0
 		_CheckerboardScale("Checkerboard Scale", Float) = 0
 		_CheckerboardShift("Checkerboard Shift Distance", Float) = 0
 		_Quantization("Quantization", Range(0,1)) = 0
@@ -145,11 +154,13 @@
 		_KaleidoscopeSegments("Kaleidoscope Segments", Range(0,32)) = 0
 		_KaleidoscopeAngle("Kaleidoscope Angle", Float) = 0
 
+		_BlockDisplacementAngle("Block Displacement Angle", Float) = 0
 		_BlockDisplacementSize("Block Displacement Size", Float) = 0
 		_BlockDisplacementIntensity("Block Displacement Intensity", Float) = 0
 		[Enum(Smooth, 0, Random, 1)] _BlockDisplacementMode("Block Displacement Mode", Float) = 0
 		_BlockDisplacementOffset("Block Displacement Offset", Float) = 0
 
+		_GlitchAngle("Glitch Angle", Float) = 0
 		_GlitchCount("Glitch Count", Range(0, 32)) = 0
 		_MaxGlitchWidth("Max Glitch Width", Float) = 0
 		_MaxGlitchHeight("Max Glitch Height", Float) = 0
@@ -183,6 +194,8 @@
 		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
 		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
 		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
+
+		_ColorMask("Color Mask", Color) = (1, 1, 1, 1)
 
 		_Hue("Hue", Float) = 0
 		_Saturation("Saturation", Float) = 0
@@ -298,16 +311,20 @@
 			float _MoveY;
 			float _MoveZ;
 
+			float _SplitXAngle;
 			float _SplitXDistance;
 			float _SplitXHalf;
 
+			float _SplitYAngle;
 			float _SplitYDistance;
 			float _SplitYHalf;
 
+			float _SkewXAngle;
 			float _SkewXDistance;
 			float _SkewXInterval;
 			float _SkewXOffset;
 
+			float _SkewYAngle;
 			float _SkewYDistance;
 			float _SkewYInterval;
 			float _SkewYOffset;
@@ -339,6 +356,7 @@
 			float _SinBarYInterval;
 			float _SinBarYOffset;
 
+			float _CheckerboardAngle;
 			float _CheckerboardScale;
 			float _CheckerboardShift;
 			float _Quantization;
@@ -351,10 +369,12 @@
 
 			float _FishEyeIntensity;
 
+			float _SinWaveAngle;
 			float _SinWaveDensity;
 			float _SinWaveAmplitude;
 			float _SinWaveOffset;
 
+			float _TanWaveAngle;
 			float _TanWaveDensity;
 			float _TanWaveAmplitude;
 			float _TanWaveOffset;
@@ -369,10 +389,12 @@
 			float _RippleOffset;
 			float _RippleFalloff;
 
+			float _ZigZagXAngle;
 			float _ZigZagXDensity;
 			float _ZigZagXAmplitude;
 			float _ZigZagXOffset;
 
+			float _ZigZagYAngle;
 			float _ZigZagYDensity;
 			float _ZigZagYAmplitude;
 			float _ZigZagYOffset;
@@ -380,11 +402,13 @@
 			float _KaleidoscopeSegments;
 			float _KaleidoscopeAngle;
 
+			float _BlockDisplacementAngle;
 			float _BlockDisplacementSize;
 			float _BlockDisplacementIntensity;
 			float _BlockDisplacementMode;
 			float _BlockDisplacementOffset;
 
+			float _GlitchAngle;
 			float _GlitchCount;
 			float _MaxGlitchWidth;
 			float _MaxGlitchHeight;
@@ -407,6 +431,8 @@
 			float4 _EdgelordStripeColor;
 			float _EdgelordStripeSize;
 			float _EdgelordStripeOffset;
+
+			float4 _ColorMask;
 
 			float _Hue;
 			float _Saturation;
@@ -598,23 +624,52 @@
 
 				i.worldPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
 
+				if (_SplitXDistance != 0)
+				{
+					float flipPoint = i.worldPos.x;
+					if (_SplitXAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, axisFront, _SplitXAngle).x;
+
+					i.worldPos = stereoSplit(i.worldPos, axisRight, flipPoint, _SplitXDistance, _SplitXHalf, clearPixel);
+				}
+				if (_SplitYDistance != 0)
+				{
+					float flipPoint = i.worldPos.y;
+					if (_SplitYAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, axisFront, _SplitYAngle).y;
+
+					i.worldPos = stereoSplit(i.worldPos, axisUp, flipPoint, _SplitYDistance, _SplitYHalf, clearPixel);
+				}
+					
+
 				// At interval of 0 the screen will be blank,
 				// so we must check both distance and interval
-				if(_SkewXDistance != 0 && _SkewXInterval != 0)
+				if (_SkewXDistance != 0 && _SkewXInterval != 0)
+				{
+					if(_SkewXAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _SkewXAngle);
+
 					i.worldPos = stereoSkew(i.worldPos, axisRight, i.worldPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
+
+					if (_SkewXAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SkewXAngle);
+				}
 				if (_SkewYDistance != 0 && _SkewYInterval != 0)
+				{
+					if (_SkewYAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _SkewYAngle);
+
 					i.worldPos = stereoSkew(i.worldPos, axisUp, i.worldPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 
-				if (_SplitXDistance != 0)
-					i.worldPos = stereoSplit(i.worldPos, axisRight, i.worldPos.x, _SplitXDistance, _SplitXHalf, clearPixel);
-				if (_SplitYDistance != 0)
-					i.worldPos = stereoSplit(i.worldPos, axisUp, i.worldPos.y, _SplitYDistance, _SplitYHalf, clearPixel);
+					if (_SkewYAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SkewYAngle);
+				}
 
 				if (_BarXDistance != 0)
 				{
 					float flipPoint = i.worldPos.y;
 					if (_BarXAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, i.camFront, _BarXAngle).y;
+						flipPoint = stereoRotate(i.worldPos, axisFront, _BarXAngle).y;
 
 					i.worldPos = stereoBar(i.worldPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
 				}
@@ -622,7 +677,7 @@
 				{
 					float flipPoint = i.worldPos.x;
 					if (_BarYAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, i.camFront, _BarYAngle).x;
+						flipPoint = stereoRotate(i.worldPos, axisFront, _BarYAngle).x;
 
 					i.worldPos = stereoBar(i.worldPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
 				}
@@ -631,7 +686,7 @@
 				{
 					float flipPoint = i.worldPos.y;
 					if (_SinBarXAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, i.camFront, _SinBarXAngle).y;
+						flipPoint = stereoRotate(i.worldPos, axisFront, _SinBarXAngle).y;
 
 					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
 				}
@@ -639,20 +694,56 @@
 				{
 					float flipPoint = i.worldPos.x;
 					if (_SinBarYAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, i.camFront, _SinBarYAngle).x;
+						flipPoint = stereoRotate(i.worldPos, axisFront, _SinBarYAngle).x;
 
 					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
 				}
 
 				if (_ZigZagXDensity != 0)
-					i.worldPos = stereoZigZag(i.worldPos, axisRight, i.worldPos.y, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
+				{
+					float flipPoint = i.worldPos.y;
+					if (_ZigZagXAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, axisFront, _ZigZagXAngle).y;
+
+					i.worldPos = stereoZigZag(i.worldPos, axisRight, flipPoint, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
+				}
 				if (_ZigZagYDensity != 0)
-					i.worldPos = stereoZigZag(i.worldPos, axisUp, i.worldPos.x, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
+				{
+					float flipPoint = i.worldPos.x;
+					if (_ZigZagYAngle != 0)
+						flipPoint = stereoRotate(i.worldPos, axisFront, _ZigZagYAngle).x;
+
+					i.worldPos = stereoZigZag(i.worldPos, axisUp, flipPoint, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
+				}
 
 				if (_SinWaveDensity != 0)
-					i.worldPos = stereoSinWave(i.worldPos, axisRight, _SinWaveDensity / 100 , _SinWaveAmplitude, _SinWaveOffset);
+				{
+					float3 axis = axisRight;
+					if (_SinWaveAngle != 0)
+					{
+						axis = stereoRotate(float4(axis, 0), axisFront, _SinWaveAngle);
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _SinWaveAngle);
+					}
+
+					i.worldPos = stereoSinWave(i.worldPos, axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
+
+					if (_SinWaveAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SinWaveAngle);
+				}
 				if (_TanWaveDensity != 0)
+				{
+					float3 axis = axisRight;
+					if (_TanWaveAngle != 0)
+					{
+						axis = stereoRotate(float4(axis, 0), axisFront, _TanWaveAngle);
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _TanWaveAngle);
+					}
+
 					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
+
+					if (_TanWaveAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_TanWaveAngle);
+				}
 
 				if (_SliceDistance != 0)
 					i.worldPos = stereoSlice(i.worldPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance, _SliceOffset);
@@ -661,7 +752,7 @@
 					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleFalloff);
 
 				if (_CheckerboardScale != 0)
-					i.worldPos = stereoCheckerboard(i.worldPos, _CheckerboardScale, _CheckerboardShift);
+					i.worldPos = stereoCheckerboard(i.worldPos, axisFront, _CheckerboardAngle, _CheckerboardScale, _CheckerboardShift);
 
 				if (_Quantization != 0)
 					i.worldPos = stereoQuantization(i.worldPos, 10.0 - _Quantization*10.0);
@@ -682,13 +773,29 @@
 					i.worldPos = stereoKaleidoscope(i.worldPos, axisFront, _KaleidoscopeAngle, _KaleidoscopeSegments);
 
 				if (_BlockDisplacementSize != 0)
+				{
+					if (_BlockDisplacementAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _BlockDisplacementAngle);
+
 					i.worldPos = stereoBlockDisplacement(i.worldPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
+
+					if (_BlockDisplacementAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_BlockDisplacementAngle);
+				}
 
 				// Think you have enough function parameters there buddy?
 				if (_GlitchCount != 0 && _GlitchIntensity != 0)
+				{
+					if (_GlitchAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _GlitchAngle);
+
 					i.worldPos = stereoGlitch(i.worldPos, axisFront, axisRight, axisUp,
 						_GlitchCount, _MaxGlitchWidth, _MaxGlitchHeight, _GlitchIntensity,
 						_GlitchSeed, _GlitchSeedInterval);
+
+					if (_GlitchAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_GlitchAngle);
+				}
 
 				if(_NoiseScale != 0 && _NoiseStrength != 0)
 					i.worldPos.xyz += snoise((i.worldPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
@@ -745,6 +852,8 @@
 						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength);
 					else
 						bgcolor += tex2Dproj(_stereoCancerTexture, stereoPosition);
+
+					bgcolor *= _ColorMask;
 				}
 
 				if (_EdgelordStripeSize != 0)
