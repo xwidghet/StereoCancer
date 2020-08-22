@@ -129,8 +129,27 @@ float4 stereoMove(float4 worldPos, float3 camFront, float3 camRight, float angle
 	return worldPos;
 }
 
+float4 stereoShake(float4 worldPos, float shakeSpeed, float shakeXIntensity, float shakeXAmplitude, float shakeYIntensity, float shakeYAmplitude, 
+	float shakeZIntensity, float shakeZAmplitude)
+{
+	float shakeTime = _Time.y * shakeSpeed;
+	float3 randomAxis1 = float3(shakeTime,
+		shakeTime + 17,
+		shakeTime + 29);
+
+	float3 noisePos = float3(
+		snoise(randomAxis1.xyz / shakeXAmplitude),
+		snoise(randomAxis1.yzx / shakeYAmplitude),
+		snoise(randomAxis1.zxy / shakeZAmplitude));
+
+	worldPos.xyz += noisePos * float3(shakeXIntensity, shakeYIntensity, shakeZIntensity);
+
+	return worldPos;
+}
+
 float4 stereoSplit(float4 worldPos, float3 axis, float splitPoint, float distance, float oneSide, inout bool clearPixel)
 {
+	UNITY_BRANCH
 	if (oneSide != 0)
 	{
 		if (sign(distance) == -sign(splitPoint))
@@ -212,6 +231,7 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 
 	// This could be done every loop, but it doesn't increase
 	// quality enough to be worth the performance hit
+	UNITY_BRANCH
 	if (randomization != 0)
 		offset = gold_noise(_Time.z, _Time.y)*randomization;
 
@@ -237,6 +257,7 @@ float4 stereoCheckerboard(float4 coordinates, float3 axis, float angle, float sc
 {
 	float4 localCoordinates = coordinates;
 	
+	UNITY_BRANCH
 	if (angle != 0)
 		localCoordinates = stereoRotate(localCoordinates, axis, angle);
 
@@ -271,6 +292,7 @@ float4 stereoRingRotation(float4 worldCoordinates,float3 camFront, float angle, 
 	float3 toWorldVector = normalize(worldCoordinates);
 	float AngleToFront = acos(dot(toWorldVector, camFront));
 
+	UNITY_BRANCH
 	if (fmod(abs(AngleToFront), ringRadius - ringWidth) > ringRadius)
 		worldCoordinates = stereoRotate(worldCoordinates, camFront, angle);
 
@@ -303,26 +325,33 @@ float4 stereoFishEye(float4 worldCoordinates, float3 camFront, float intensity)
 	return worldCoordinates;
 }
 
-float4 stereoSinWave(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
+float4 stereoSinWave(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset)
 {
-	worldCoordinates.xyz += camRight * sin((worldCoordinates.y + offset) * density) * amplitude;
+	worldCoordinates.xyz += axis * sin((worldCoordinates.y + offset) * density) * amplitude;
 
 	return worldCoordinates;
 }
 
-float4 stereoTanWave(float4 worldCoordinates, float3 camRight, float density, float amplitude, float offset)
+float4 stereoCosWave(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset)
 {
-	worldCoordinates.xyz += camRight * tan((worldCoordinates.y + offset) * density) * amplitude;
+	worldCoordinates.xyz += axis * cos((worldCoordinates.x + offset) * density) * amplitude;
+
+	return worldCoordinates;
+}
+
+float4 stereoTanWave(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset)
+{
+	worldCoordinates.xyz += axis * tan((worldCoordinates.y + offset) * density) * amplitude;
 
 	return worldCoordinates;
 }
 
 float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance, float offset)
 {
-	
 	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), angle), worldCoordinates.xyz);
 	worldCoordinates.xyz.x += offset;
 
+	UNITY_BRANCH
 	if (abs(worldCoordinates.x) <= width)
 		worldCoordinates.xyz += axis*distance;
 
@@ -338,6 +367,7 @@ float4 stereoRipple(float4 worldCoordinates, float3 axis, float density, float a
 
 	// Allows the user to create a water droplet effect by increasing falloff and offset
 	// together.
+	UNITY_BRANCH
 	if (falloff != 0)
 		amplitude *= clamp((falloff - dist) / falloff, 0, 1);
 
@@ -351,6 +381,7 @@ float4 stereoZigZag(float4 worldCoordinates, float3 moveAxis, float flipPoint, f
 	float effectVal = (flipPoint / density + offset);
 	effectVal = fmod(abs(effectVal), 2.0);
 
+	UNITY_BRANCH
 	if (effectVal > 1)
 		effectVal = 2.0 - effectVal;
 
@@ -366,6 +397,7 @@ float4 stereoBlockDisplacement(float4 worldCoordinates, float blockSize, float i
 	seed = seed == 0 ? 0.001 : seed;
 
 	float seedCheck = fmod(seed, 10);
+	UNITY_BRANCH
 	if (seedCheck <= 0.001)
 		seed += sign(seed)*0.0001;
 	else if (seedCheck >= 9.999)
@@ -376,6 +408,7 @@ float4 stereoBlockDisplacement(float4 worldCoordinates, float blockSize, float i
 	float2 block = floor(worldCoordinates.xy / blockSize + 0.5);
 	float2 scale = float2(0, 0);
 
+	UNITY_BRANCH
 	if (displacementMode == 0)
 		scale = float2(snoise(float3(block, seed / 10)), snoise(float3(block, -seed / 10)))*0.5 + 0.5;
 	else
@@ -389,22 +422,32 @@ float4 stereoBlockDisplacement(float4 worldCoordinates, float blockSize, float i
 }
 
 float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, float3 camUp, int glitchCount,
-	float maxGlitchWidth, float maxGlitchHeight, float glitchIntensity, float seed,
-	float seedInterval)
+	float minGlitchWidth, float minGlitchHeight, float maxGlitchWidth, float maxGlitchHeight, float glitchIntensity,
+	float seed, float seedInterval)
 {
 	seed = floor(seed / seedInterval);
+
+	float distWidth = maxGlitchWidth - minGlitchWidth;
+	float distHeight = maxGlitchHeight - minGlitchHeight;
+
+	float spawnRangeX = 100 + (minGlitchWidth + distWidth / 2);
+	float halfSpawnRangeX = spawnRangeX * 0.5;
+
+	float spawnRangeY = 100 + (minGlitchHeight + distHeight / 2);
+	float halfSpawnRangeY = spawnRangeY * 0.5;
 
 	for (int i = 0; i < glitchCount; i++)
 	{
 		// minX, maxX, minY, maxY
 		float4 boundingBox;
 		
-		boundingBox.y = gold_noise(seed + 2, seed + 3) * 100 - 50;
-		boundingBox.x = boundingBox.y - gold_noise(seed, seed + 1) * maxGlitchWidth;
+		boundingBox.y = gold_noise(seed + 2, seed + 3) * spawnRangeX - halfSpawnRangeX;
+		boundingBox.x = boundingBox.y - (minGlitchWidth + gold_noise(seed, seed + 1) * distWidth);
 		
-		boundingBox.w = gold_noise(seed + 6, seed + 7) * 100 - 50;
-		boundingBox.z = boundingBox.w - gold_noise(seed + 4, seed + 5) * maxGlitchHeight;
+		boundingBox.w = gold_noise(seed + 6, seed + 7) * spawnRangeY - halfSpawnRangeY;
+		boundingBox.z = boundingBox.w - (minGlitchHeight + gold_noise(seed + 4, seed + 5) * distHeight);
 
+		UNITY_BRANCH
 		if (worldCoordinates.x >= boundingBox.x && worldCoordinates.x <= boundingBox.y
 			&& worldCoordinates.y >= boundingBox.z && worldCoordinates.y <= boundingBox.w)
 		{
@@ -464,6 +507,7 @@ float4 stereoVoroniNoise(float4 worldCoordinates, float scale, float offset, flo
 	// Turn what would normally be used for color into a directional vector
 	float3 cellVector = normalize(rand1dTo3d(vNoise.y) - 0.5);
 
+	UNITY_BRANCH
 	if (borderSize != 0)
 	{
 		float valueChange = fwidth(samplePoint.z) * borderSize;
@@ -508,6 +552,20 @@ float4 stereoVoroniNoise(float4 worldCoordinates, float scale, float offset, flo
 	return worldCoordinates;
 }
 
+float3 colorVectorDisplacement(sampler2D textureHandle, float4 stereoPosition, float displacementStrength)
+{
+	float3 colorDirectionVector = tex2Dproj(textureHandle, stereoPosition).rgb;
+
+	// Apply reinhard tonemapping so that bright lighting and avatars
+	// don't ruin the effect
+	colorDirectionVector /= (colorDirectionVector + 1);
+
+	// Turn screen color into a directional vector
+	colorDirectionVector -= 0.5;
+
+	return colorDirectionVector * displacementStrength;
+}
+
   /////////////////////
  // Color functions //
 /////////////////////
@@ -518,13 +576,14 @@ half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripe
 	float y = uv.y + offset;
 
 	// Should implement SDF anti-aliasing if I add stripe rotation
+	UNITY_BRANCH
 	if (fmod(y, stripeSize) < stripeSize / 2.f)
 		bgColor *= half4(stripeColor.rgb * stripeColor.a, 1.0);
 
 	return bgColor;
 }
 
-half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength)
+half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation)
 {
 	float3 abberationVector = worldCoordinates.xyz - _WorldSpaceCameraPos;
 	abberationVector = normalize(abberationVector);
@@ -538,9 +597,9 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 
 	// Emulate camera lense distortion by applying different fish-eye lense intensity
 	// effects to each channel. Doesn't utilize stereoFishEye to avoid redundant work.
-	redAbberationPos.xyz += camFront * (angleToWorldVector * 10.02 * strength);
-	greenAbberationPos.xyz += camFront * (angleToWorldVector * 11.52 * strength);
-	blueAbberationPos.xyz += camFront * (angleToWorldVector * 13.02 * strength);
+	redAbberationPos.xyz += camFront * (angleToWorldVector * 10.0 * strength);
+	greenAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation) * strength);
+	blueAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation*2) * strength);
 
 	redAbberationPos = computeStereoUV(redAbberationPos);
 	greenAbberationPos = computeStereoUV(greenAbberationPos);
@@ -585,6 +644,7 @@ half3 signalNoise(float4 worldPos, float scale, float colorization, float opacit
 	noisePos.z += gold_noise(_Time.z, _Time.y) * 10000;
 	noisePos = mul(rotAxis(randomAxis1, _Time.y * 1000), noisePos);
 
+	UNITY_BRANCH
 	if (colorization != 0)
 	{
 		half4 noisecolor = half4(
@@ -605,6 +665,31 @@ half3 signalNoise(float4 worldPos, float scale, float colorization, float opacit
 	{
 		return snoise(noisePos / scale) * opacity;
 	}
+}
+
+half3 circularVignette(half4 bgcolor, float4 worldPos, float4 color, float opacity, float roundness, float fallOffMode, float begin, float end)
+{
+	worldPos.y /= roundness;
+	float vignetteDist = length(worldPos.xy);
+
+	float falloffDist = end - begin;
+	vignetteDist = (vignetteDist - begin) / falloffDist;
+
+	float vignetteFallOffAlpha = clamp(1.0 - vignetteDist, 0, 1);
+
+	// Linear by default
+	// Squared
+	UNITY_BRANCH
+	if (fallOffMode == 1)
+		vignetteFallOffAlpha *= vignetteFallOffAlpha;
+	// Log2
+	else
+		vignetteFallOffAlpha = log2(1 + vignetteFallOffAlpha);
+
+	bgcolor.rgb = lerp(bgcolor.rgb*(1 - opacity), bgcolor.rgb, vignetteFallOffAlpha);
+	bgcolor.rgb += color * (opacity * (1 - vignetteFallOffAlpha));
+
+	return bgcolor.rgb;
 }
 
 half3 applyHSV(half4 bgcolor, float hue, float saturation, float value)

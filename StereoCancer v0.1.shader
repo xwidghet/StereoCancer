@@ -67,6 +67,14 @@
 		_MoveY("Move Y (Down-/Up+)", Float) = 0
 		_MoveZ("Move Z (Forward-/Back+)", Float) = 0
 
+		_ScreenShakeSpeed("Screen Shake Speed", Float) = 50
+		_ScreenShakeXIntensity("Screen Shake X Intensity", Float) = 0
+		_ScreenShakeXAmplitude("Screen Shake X Amplitude", Float) = 10
+		_ScreenShakeYIntensity("Screen Shake Y Intensity", Float) = 0
+		_ScreenShakeYAmplitude("Screen Shake Y Amplitude", Float) = 10
+		_ScreenShakeZIntensity("Screen Shake Z Intensity", Float) = 0
+		_ScreenShakeZAmplitude("Screen Shake Z Amplitude", Float) = 10
+
 		_SplitXAngle("Split X Angle", Float) = 0
 		_SplitXDistance("Split X Distance", Float) = 0
 		_SplitXHalf("Split X Half", Float) = 0
@@ -120,6 +128,11 @@
 		_SinWaveAmplitude("Sin Wave Amplitude", Float) = 0
 		_SinWaveOffset("Sin Wave Offset", Float) = 0
 
+		_CosWaveAngle("Cos Wave Angle", Float) = 0
+		_CosWaveDensity("Cos Wave Density", Float) = 0
+		_CosWaveAmplitude("Cos Wave Amplitude", Float) = 0
+		_CosWaveOffset("Cos Wave Offset", Float) = 0
+
 		_TanWaveAngle("Tan Wave Angle", Float) = 0
 		_TanWaveDensity("Tan Wave Density", Float) = 0
 		_TanWaveAmplitude("Tan Wave Amplitude", Float) = 0
@@ -162,6 +175,8 @@
 
 		_GlitchAngle("Glitch Angle", Float) = 0
 		_GlitchCount("Glitch Count", Range(0, 32)) = 0
+		_MinGlitchWidth("Min Glitch Width", Float) = 0
+		_MinGlitchHeight("Min Glitch Height", Float) = 0
 		_MaxGlitchWidth("Max Glitch Width", Float) = 0
 		_MaxGlitchHeight("Max Glitch Height", Float) = 0
 		_GlitchIntensity("Glitch Intensity", Float) = 0
@@ -183,6 +198,8 @@
 		_GeometricDitherQuality("Geometric Dither Quality", Range(1, 6)) = 5
 		_GeometricDitherRandomization("Geometric Dither Randomization", Float) = 0
 
+		_ColorVectorDisplacementStrength("Color Vector Displacement Strength", Float) = 0
+
 		// Screen color effects
 		[Header(Screen Color Effects)]
 		_SignalNoiseSize("Signal Noise Size", Float) = 0
@@ -190,7 +207,15 @@
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
 
 		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
+		_ChromaticAbberationSeparation("Chromatic Abberation Separation", Float) = 1.5
 
+		_CircularVignetteColor("Circular Vignette Color", Color) = (0, 0, 0, 1)
+		_CircularVignetteOpacity("Circular Vignette Opacity", Range(0, 1)) = 0
+		[Enum(Linear, 0, Squared, 1, Log2, 2)] _CircularVignetteMode("Circular Vignette Mode", Float) = 2
+		_CircularVignetteRoundness("Circular Vignette Roundness", Range(0, 1)) = 1
+		_CircularVignetteBegin("Circular Vignette Begin Distance", Float) = 25
+		_CircularVignetteEnd("Circular Vignette End Distance", Float) = 50
+			
 		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
 		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
 		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
@@ -254,7 +279,7 @@
 		//		 along with all of their references to match: 
 		//			sampler2D _stereoCancerTexture;
 		//			float4 _stereoCancerTexture_TexelSize;
-		
+
 		GrabPass
 		{
 			"_stereoCancerTexture"
@@ -311,6 +336,14 @@
 			float _MoveY;
 			float _MoveZ;
 
+			float _ScreenShakeSpeed;
+			float _ScreenShakeXIntensity;
+			float _ScreenShakeXAmplitude;
+			float _ScreenShakeYIntensity;
+			float _ScreenShakeYAmplitude;
+			float _ScreenShakeZIntensity;
+			float _ScreenShakeZAmplitude;
+
 			float _SplitXAngle;
 			float _SplitXDistance;
 			float _SplitXHalf;
@@ -332,6 +365,8 @@
 			float _GeometricDitherDistance;
 			float _GeometricDitherQuality;
 			float _GeometricDitherRandomization;
+
+			float _ColorVectorDisplacementStrength;
 
 			float _WarpIntensity;
 			float _WarpAngle;
@@ -374,6 +409,11 @@
 			float _SinWaveAmplitude;
 			float _SinWaveOffset;
 
+			float _CosWaveAngle;
+			float _CosWaveDensity;
+			float _CosWaveAmplitude;
+			float _CosWaveOffset;
+
 			float _TanWaveAngle;
 			float _TanWaveDensity;
 			float _TanWaveAmplitude;
@@ -410,6 +450,8 @@
 
 			float _GlitchAngle;
 			float _GlitchCount;
+			float _MinGlitchWidth;
+			float _MinGlitchHeight;
 			float _MaxGlitchWidth;
 			float _MaxGlitchHeight;
 			float _GlitchIntensity;
@@ -443,10 +485,18 @@
 			float _ImaginaryColorAngle;
 
 			float _ChromaticAbberationStrength;
+			float _ChromaticAbberationSeparation;
 
 			float _SignalNoiseSize;
 			float _ColorizedSignalNoise;
 			float _SignalNoiseOpacity;
+
+			float4 _CircularVignetteColor;
+			float _CircularVignetteOpacity;
+			float _CircularVignetteRoundness;
+			float _CircularVignetteMode;
+			float _CircularVignetteBegin;
+			float _CircularVignetteEnd;
 
 			float _colorSkewRDistance;
 			float _colorSkewRAngle;
@@ -609,116 +659,148 @@
 				  //////////////////////////////////////////
 				 // Apply world-space distortion effects //
 				//////////////////////////////////////////
-
+				UNITY_BRANCH
 				if (_ShrinkHeight != 0)
 					i.worldPos = shrink(worldVector, axisUp, i.worldPos, _ShrinkHeight);
+				UNITY_BRANCH
 				if (_ShrinkWidth != 0)
 					i.worldPos = shrink(worldVector, axisRight, i.worldPos, _ShrinkWidth);
 
+				UNITY_BRANCH
 				if(_RotationX != 0)
 					i.worldPos = stereoRotate(i.worldPos, axisRight, _RotationX);
+				UNITY_BRANCH
 				if (_RotationY != 0)
 					i.worldPos = stereoRotate(i.worldPos, axisUp, _RotationY);
+				UNITY_BRANCH
 				if (_RotationZ != 0)
 					i.worldPos = stereoRotate(i.worldPos, axisFront, _RotationZ);
 
 				i.worldPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
 
+				UNITY_BRANCH
+				if(_ScreenShakeXIntensity != 0 || _ScreenShakeYIntensity != 0 || _ScreenShakeZIntensity != 0)
+					i.worldPos = stereoShake(i.worldPos, _ScreenShakeSpeed, _ScreenShakeXIntensity, _ScreenShakeXAmplitude, _ScreenShakeYIntensity, _ScreenShakeYAmplitude,
+						_ScreenShakeZIntensity, _ScreenShakeZAmplitude);
+
+				UNITY_BRANCH
 				if (_SplitXDistance != 0)
 				{
 					float flipPoint = i.worldPos.x;
+					UNITY_BRANCH
 					if (_SplitXAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _SplitXAngle).x;
 
 					i.worldPos = stereoSplit(i.worldPos, axisRight, flipPoint, _SplitXDistance, _SplitXHalf, clearPixel);
 				}
+				UNITY_BRANCH
 				if (_SplitYDistance != 0)
 				{
 					float flipPoint = i.worldPos.y;
+					UNITY_BRANCH
 					if (_SplitYAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _SplitYAngle).y;
 
 					i.worldPos = stereoSplit(i.worldPos, axisUp, flipPoint, _SplitYDistance, _SplitYHalf, clearPixel);
 				}
-					
 
 				// At interval of 0 the screen will be blank,
 				// so we must check both distance and interval
+				UNITY_BRANCH
 				if (_SkewXDistance != 0 && _SkewXInterval != 0)
 				{
+					UNITY_BRANCH
 					if(_SkewXAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, _SkewXAngle);
 
 					i.worldPos = stereoSkew(i.worldPos, axisRight, i.worldPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
 
+					UNITY_BRANCH
 					if (_SkewXAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SkewXAngle);
 				}
+				UNITY_BRANCH
 				if (_SkewYDistance != 0 && _SkewYInterval != 0)
 				{
+					UNITY_BRANCH
 					if (_SkewYAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, _SkewYAngle);
 
 					i.worldPos = stereoSkew(i.worldPos, axisUp, i.worldPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 
+					UNITY_BRANCH
 					if (_SkewYAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SkewYAngle);
 				}
 
+				UNITY_BRANCH
 				if (_BarXDistance != 0)
 				{
 					float flipPoint = i.worldPos.y;
+					UNITY_BRANCH
 					if (_BarXAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _BarXAngle).y;
 
 					i.worldPos = stereoBar(i.worldPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
 				}
+				UNITY_BRANCH
 				if (_BarYDistance != 0)
 				{
 					float flipPoint = i.worldPos.x;
+					UNITY_BRANCH
 					if (_BarYAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _BarYAngle).x;
 
 					i.worldPos = stereoBar(i.worldPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
 				}
 
+				UNITY_BRANCH
 				if (_SinBarXDistance != 0 && _SinBarXInterval != 0)
 				{
 					float flipPoint = i.worldPos.y;
+					UNITY_BRANCH
 					if (_SinBarXAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _SinBarXAngle).y;
 
 					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
 				}
+				UNITY_BRANCH
 				if (_SinBarYDistance != 0 && _SinBarYInterval != 0)
 				{
 					float flipPoint = i.worldPos.x;
+					UNITY_BRANCH
 					if (_SinBarYAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _SinBarYAngle).x;
 
 					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
 				}
 
+				UNITY_BRANCH
 				if (_ZigZagXDensity != 0)
 				{
 					float flipPoint = i.worldPos.y;
+					UNITY_BRANCH
 					if (_ZigZagXAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _ZigZagXAngle).y;
 
 					i.worldPos = stereoZigZag(i.worldPos, axisRight, flipPoint, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
 				}
+				UNITY_BRANCH
 				if (_ZigZagYDensity != 0)
 				{
 					float flipPoint = i.worldPos.x;
+					UNITY_BRANCH
 					if (_ZigZagYAngle != 0)
 						flipPoint = stereoRotate(i.worldPos, axisFront, _ZigZagYAngle).x;
 
 					i.worldPos = stereoZigZag(i.worldPos, axisUp, flipPoint, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 				}
 
+				UNITY_BRANCH
 				if (_SinWaveDensity != 0)
 				{
 					float3 axis = axisRight;
+					UNITY_BRANCH
 					if (_SinWaveAngle != 0)
 					{
 						axis = stereoRotate(float4(axis, 0), axisFront, _SinWaveAngle);
@@ -727,12 +809,32 @@
 
 					i.worldPos = stereoSinWave(i.worldPos, axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
 
+					UNITY_BRANCH
 					if (_SinWaveAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SinWaveAngle);
 				}
+				UNITY_BRANCH
+				if (_CosWaveDensity != 0)
+				{
+					float3 axis = axisUp;
+					UNITY_BRANCH
+					if (_CosWaveAngle != 0)
+					{
+						axis = stereoRotate(float4(axis, 0), axisFront, _CosWaveAngle);
+						i.worldPos = stereoRotate(i.worldPos, axisFront, _CosWaveAngle);
+					}
+
+					i.worldPos = stereoCosWave(i.worldPos, axis, _CosWaveDensity / 100, _CosWaveAmplitude, _CosWaveOffset);
+
+					UNITY_BRANCH
+					if (_CosWaveAngle != 0)
+						i.worldPos = stereoRotate(i.worldPos, axisFront, -_CosWaveAngle);
+				}
+				UNITY_BRANCH
 				if (_TanWaveDensity != 0)
 				{
 					float3 axis = axisRight;
+					UNITY_BRANCH
 					if (_TanWaveAngle != 0)
 					{
 						axis = stereoRotate(float4(axis, 0), axisFront, _TanWaveAngle);
@@ -741,68 +843,86 @@
 
 					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
 
+					UNITY_BRANCH
 					if (_TanWaveAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, -_TanWaveAngle);
 				}
 
+				UNITY_BRANCH
 				if (_SliceDistance != 0)
 					i.worldPos = stereoSlice(i.worldPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance, _SliceOffset);
 				
+				UNITY_BRANCH
 				if (_RippleAmplitude != 0)
 					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleFalloff);
 
+				UNITY_BRANCH
 				if (_CheckerboardScale != 0)
 					i.worldPos = stereoCheckerboard(i.worldPos, axisFront, _CheckerboardAngle, _CheckerboardScale, _CheckerboardShift);
 
+				UNITY_BRANCH
 				if (_Quantization != 0)
 					i.worldPos = stereoQuantization(i.worldPos, 10.0 - _Quantization*10.0);
 
+				UNITY_BRANCH
 				if (_RingRotationWidth != 0)
 					i.worldPos = stereoRingRotation(i.worldPos, axisFront, _RingRotationAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
 
+				UNITY_BRANCH
 				if (_WarpIntensity != 0)
 					i.worldPos = stereoWarp(i.worldPos, axisFront, _WarpAngle, _WarpIntensity);
 
+				UNITY_BRANCH
 				if (_SpiralIntensity != 0)
 					i.worldPos = stereoSpiral(i.worldPos, axisFront, _SpiralIntensity / 1000);
 
+				UNITY_BRANCH
 				if(_FishEyeIntensity != 0)
 					i.worldPos = stereoFishEye(i.worldPos, axisFront, _FishEyeIntensity);
 
+				UNITY_BRANCH
 				if(_KaleidoscopeSegments > 0)
 					i.worldPos = stereoKaleidoscope(i.worldPos, axisFront, _KaleidoscopeAngle, _KaleidoscopeSegments);
 
+				UNITY_BRANCH
 				if (_BlockDisplacementSize != 0)
 				{
+					UNITY_BRANCH
 					if (_BlockDisplacementAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, _BlockDisplacementAngle);
 
 					i.worldPos = stereoBlockDisplacement(i.worldPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
 
+					UNITY_BRANCH
 					if (_BlockDisplacementAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, -_BlockDisplacementAngle);
 				}
 
 				// Think you have enough function parameters there buddy?
+				UNITY_BRANCH
 				if (_GlitchCount != 0 && _GlitchIntensity != 0)
 				{
+					UNITY_BRANCH
 					if (_GlitchAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, _GlitchAngle);
 
 					i.worldPos = stereoGlitch(i.worldPos, axisFront, axisRight, axisUp,
-						_GlitchCount, _MaxGlitchWidth, _MaxGlitchHeight, _GlitchIntensity,
-						_GlitchSeed, _GlitchSeedInterval);
+						_GlitchCount, _MinGlitchWidth, _MinGlitchHeight, _MaxGlitchWidth, 
+						_MaxGlitchHeight, _GlitchIntensity, _GlitchSeed, _GlitchSeedInterval);
 
+					UNITY_BRANCH
 					if (_GlitchAngle != 0)
 						i.worldPos = stereoRotate(i.worldPos, axisFront, -_GlitchAngle);
 				}
 
+				UNITY_BRANCH
 				if(_NoiseScale != 0 && _NoiseStrength != 0)
 					i.worldPos.xyz += snoise((i.worldPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
+				UNITY_BRANCH
 				if (_VoroniNoiseScale != 0 && (_VoroniNoiseStrength != 0 || _VoroniNoiseBorderStrength != 0))
 					i.worldPos = stereoVoroniNoise(i.worldPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
 					
-				
+				UNITY_BRANCH
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
 
@@ -814,6 +934,7 @@
 				// Initialize color now so we can apply signal noise in default world-axis space
 				half4 bgcolor = half4(0, 0, 0, 0);
 
+				UNITY_BRANCH
 				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
 					bgcolor.rgb += signalNoise(i.worldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
 
@@ -826,17 +947,30 @@
 				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
 				i.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
 
-				// Finally convert world position to the stereo-correct position
+				// Finally acquire our stereo position with which we can sample the screen texture.
 				float4 stereoPosition = computeStereoUV(i.worldPos);
+
+				UNITY_BRANCH
+				if (_ColorVectorDisplacementStrength != 0)
+				{
+					finishedWorldPos.xyz += colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+
+					i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
+					i.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+
+					stereoPosition = computeStereoUV(i.worldPos);
+				}
 
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
 				// each eye.
+				UNITY_BRANCH
 				if (_ScreenSamplingMode == 1)
 					stereoPosition = clampUVCoordinates(stereoPosition);
 
 				// Wrapping allows for creating 'infinite' texture
 				// and tunnel effects.
+				UNITY_BRANCH
 				if (_ScreenSamplingMode == 2)
 					stereoPosition = wrapUVCoordinates(stereoPosition);
 
@@ -846,16 +980,18 @@
 
 				// No point in sampling background color if the user is going to override it
 				// anyway.
+				UNITY_BRANCH
 				if (_colorSkewROverride == 0 || _colorSkewGOverride == 0 || _colorSkewBOverride == 0)
 				{
 					if (_ChromaticAbberationStrength != 0)
-						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength);
+						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength, _ChromaticAbberationSeparation);
 					else
 						bgcolor += tex2Dproj(_stereoCancerTexture, stereoPosition);
 
 					bgcolor *= _ColorMask;
 				}
 
+				UNITY_BRANCH
 				if (_EdgelordStripeSize != 0)
 				{
 					float2 edgelordUV = (stereoPosition.xyz / stereoPosition.w).xy;
@@ -865,6 +1001,7 @@
 				// This feature is not in a function as it will discard the current fragment
 				// if the user has chosen to completely override the background color, and I
 				// don't want that hidden.
+				UNITY_BRANCH
 				if (_MemeTexOpacity != 0)
 				{
 					float4 memePosition = finishedWorldPos;
@@ -1020,9 +1157,16 @@
 					}
 				}
 
+				UNITY_BRANCH
+				if (_CircularVignetteOpacity != 0)
+					bgcolor.rgb = circularVignette(bgcolor, finishedWorldPos, _CircularVignetteColor, _CircularVignetteOpacity,
+						_CircularVignetteRoundness,_CircularVignetteMode,_CircularVignetteBegin, _CircularVignetteEnd);
+
+				UNITY_BRANCH
 				if (_Hue != 0 || _Saturation != 0 || _Value != 0)
 					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value);
 
+				UNITY_BRANCH
 				if (_ImaginaryColorOpacity != 0)
 				{
 					half3 imaginaryColor = imaginaryColors(worldVector, _ImaginaryColorAngle)*_ImaginaryColorOpacity;
@@ -1037,6 +1181,7 @@
 
 				// Check opacity and override since the user may be intentionally
 				// removing the color channel.
+				UNITY_BRANCH
 				if (_colorSkewROpacity != 0 || _colorSkewROverride != 0)
 				{
 					float redColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewRAngle, _colorSkewRDistance,
@@ -1047,6 +1192,7 @@
 					else
 						bgcolor.r += redColor;
 				}
+				UNITY_BRANCH
 				if (_colorSkewGOpacity != 0 || _colorSkewGOverride != 0)
 				{
 					float greenColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewGAngle, _colorSkewGDistance,
@@ -1057,6 +1203,7 @@
 					else
 						bgcolor.g += greenColor;
 				}
+				UNITY_BRANCH
 				if (_colorSkewBOpacity != 0 || _colorSkewBOverride != 0)
 				{
 					float blueColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewBAngle, _colorSkewBDistance,
