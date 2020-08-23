@@ -199,6 +199,7 @@
 		_GeometricDitherRandomization("Geometric Dither Randomization", Float) = 0
 
 		_ColorVectorDisplacementStrength("Color Vector Displacement Strength", Float) = 0
+		[Enum(View, 0, World, 1)]_ColorVectorDisplacementCoordinateSpace("Color Vector Displacement Coordinate Space", Float) = 0
 
 		// Screen color effects
 		[Header(Screen Color Effects)]
@@ -367,6 +368,7 @@
 			float _GeometricDitherRandomization;
 
 			float _ColorVectorDisplacementStrength;
+			float _ColorVectorDisplacementCoordinateSpace;
 
 			float _WarpIntensity;
 			float _WarpAngle;
@@ -532,7 +534,9 @@
 				float3 camFront : TEXCOORD2;
 				float3 camRight : TEXCOORD3;
 				float3 camUp : TEXCOORD4;
-				float3x3 inverseViewMatRot : TEXCOORD5;
+				float3 camPos : TEXCOORD5;
+				float3x3 viewMatRot : TEXCOORD6;
+				float3x3 inverseViewMatRot : TEXCOORD9;
 				float4 pos : SV_POSITION;
 			};
 
@@ -546,8 +550,8 @@
 				o.camRight = normalize(cross(o.camFront, float3(0.0, 1.0, 0.0)));
 				o.camUp = normalize(cross(o.camFront, o.camRight));
 
-				float3x3 viewMatRot = extract_rotation_matrix(UNITY_MATRIX_V);
-				o.inverseViewMatRot = transpose(viewMatRot);
+				o.viewMatRot = extract_rotation_matrix(UNITY_MATRIX_V);
+				o.inverseViewMatRot = transpose(o.viewMatRot);
 
 				// The particle knows where it is, and where it isn't.
 				// It subtracts where it is, from where it isn't,
@@ -588,7 +592,8 @@
 				o.worldPos = float4(mul(o.inverseViewMatRot, v.vertex), 1);
 
 				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
-				o.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+				o.camPos = float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+				o.worldPos.xyz += o.camPos;
 
 				o.pos = mul(UNITY_MATRIX_VP, o.worldPos);
 
@@ -943,9 +948,7 @@
 				float4 finishedWorldPos = i.worldPos;
 
 				i.worldPos.xyz = mul(i.inverseViewMatRot, i.worldPos.xyz);
-
-				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
-				i.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+				i.worldPos.xyz += i.camPos;
 
 				// Finally acquire our stereo position with which we can sample the screen texture.
 				float4 stereoPosition = computeStereoUV(i.worldPos);
@@ -953,10 +956,25 @@
 				UNITY_BRANCH
 				if (_ColorVectorDisplacementStrength != 0)
 				{
-					finishedWorldPos.xyz += colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+					// View Space
+					if (_ColorVectorDisplacementCoordinateSpace == 0)
+					{
+						finishedWorldPos.xyz += colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
 
-					i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
-					i.worldPos.xyz += float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+						// Update world pos to match our new modified world axis position.
+						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
+						i.worldPos.xyz += i.camPos;
+					}
+					// World Space
+					else
+					{
+						i.worldPos.xyz += colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+
+						// The world axis aligned position (finishedWorldPos) is utilized for some effects like image overlay
+						// and vignette, so we need to propogate the world space displacement backwards.
+						finishedWorldPos.xyz = i.worldPos.xyz - i.camPos;
+						finishedWorldPos.xyz = mul(i.viewMatRot, finishedWorldPos.xyz);
+					}
 
 					stereoPosition = computeStereoUV(i.worldPos);
 				}
