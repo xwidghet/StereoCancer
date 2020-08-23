@@ -35,6 +35,23 @@
 #ifndef STEREO_CANCER_FUNCTIONS_CGINC
 #define STEREO_CANCER_FUNCTIONS_CGINC
 
+// Returns true when the vertex or fragment should not be visible
+bool mirrorCheck(float cancerDisplayMode)
+{
+	// Disable for mirrors so effects like Swirl don't get unwrapped by mirrors.
+	// Check shamelessly copy-pasted from CancerSpace, shout outs to AkaiMage.
+	// https://github.com/AkaiMage/VRC-Cancerspace
+	//
+	// Note: Does not contain the additional checks CancerSpace includes,
+	//		 such as Per-Eye exclusion, but is otherwise unmodified.
+	bool isMirror = unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0;
+	
+	// cancerDisplayMode == 0: Display on screen only
+	// cancerDisplayMode == 1: Display on mirror only
+	// cancerDisplayMode >= 2: Display on both mirror and screen.
+	return (cancerDisplayMode == 1 && !isMirror) || (cancerDisplayMode == 0 && isMirror);
+}
+
   ///////////////////////////
  // Distortion functions ///
 ///////////////////////////

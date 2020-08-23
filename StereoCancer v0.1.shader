@@ -621,26 +621,19 @@
 					else if (_Visibility == 2 && (isOther == false))
 						o.pos = float4(9999, 9999, 9999, 9999);
 				}
+
+				// Evicts the vertex to outer-space when visibility doesn't match the display mode.
+				if(mirrorCheck(_CancerDisplayMode))
+					o.pos = float4(9999, 9999, 9999, 9999);
 				
 				return o;
 			}
 
-			fixed4 frag (v2f i) : SV_Target
+			fixed4 frag(v2f i) : SV_Target
 			{
-				// Disable for mirrors so effects like Swirl don't get unwrapped by mirrors.
-				// Check shamelessly copy-pasted from CancerSpace, shout outs to AkaiMage.
-				// https://github.com/AkaiMage/VRC-Cancerspace
-				//
-				// Note: Does not contain the additional checks CancerSpace includes,
-				//		 such as Per-Eye exclusion, but is otherwise unmodified.
-				bool isMirror = unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0;
-
-				// Allow for mirror war battles by letting the user render cancer effects
-				// only in mirrors.
-				if ((_CancerDisplayMode == 1 && !isMirror) || (_CancerDisplayMode == 0 && isMirror) )
-				{
+				// Discards when visibility doesn't match the display mode.
+				if (mirrorCheck(_CancerDisplayMode))
 					discard;
-				}
 				
 				// Vector from the 'camera' to the world-axis aligned worldPos.
 				float3 worldVector = normalize(i.worldPos);
