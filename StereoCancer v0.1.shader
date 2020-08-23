@@ -199,7 +199,10 @@
 		_GeometricDitherRandomization("Geometric Dither Randomization", Float) = 0
 
 		_ColorVectorDisplacementStrength("Color Vector Displacement Strength", Float) = 0
-		[Enum(View, 0, World, 1)]_ColorVectorDisplacementCoordinateSpace("Color Vector Displacement Coordinate Space", Float) = 0
+		[Enum(View, 0, World, 1)] _ColorVectorDisplacementCoordinateSpace("Color Vector Displacement Coordinate Space", Float) = 1
+
+		_NormalVectorDisplacementStrength("Normal Vector Displacement Strength", Float) = 0
+		[Enum(View, 0, World, 1)] _NormalVectorDisplacementCoordinateSpace("Normal Vector Displacement Coordinate Space", Float) = 1
 
 		// Screen color effects
 		[Header(Screen Color Effects)]
@@ -323,6 +326,8 @@
 			sampler2D _stereoCancerTexture;
 			float4 _stereoCancerTexture_TexelSize;
 
+			sampler2D _CameraDepthTexture;
+
 			float _CancerOpacity;
 
 			// Screen distortion params
@@ -369,6 +374,9 @@
 
 			float _ColorVectorDisplacementStrength;
 			float _ColorVectorDisplacementCoordinateSpace;
+
+			float _NormalVectorDisplacementStrength;
+			float _NormalVectorDisplacementCoordinateSpace;
 
 			float _WarpIntensity;
 			float _WarpAngle;
@@ -949,10 +957,13 @@
 				UNITY_BRANCH
 				if (_ColorVectorDisplacementStrength != 0)
 				{
+					float3 colorDisplacement = colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+
 					// View Space
+					UNITY_BRANCH
 					if (_ColorVectorDisplacementCoordinateSpace == 0)
 					{
-						finishedWorldPos.xyz += colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+						finishedWorldPos.xyz += colorDisplacement;
 
 						// Update world pos to match our new modified world axis position.
 						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
@@ -961,7 +972,38 @@
 					// World Space
 					else
 					{
-						i.worldPos.xyz += colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+						i.worldPos.xyz += colorDisplacement;
+
+						// The world axis aligned position (finishedWorldPos) is utilized for some effects like image overlay
+						// and vignette, so we need to propogate the world space displacement backwards.
+						finishedWorldPos.xyz = i.worldPos.xyz - i.camPos;
+						finishedWorldPos.xyz = mul(i.viewMatRot, finishedWorldPos.xyz);
+					}
+
+					stereoPosition = computeStereoUV(i.worldPos);
+				}
+
+				// Requires a directional light to be in the scene so that _CameraDepthTexture is enabled.
+				UNITY_BRANCH
+				if (_NormalVectorDisplacementStrength != 0)
+				{
+					float3 normalDisplacement = normalVectorDisplacement(_CameraDepthTexture, stereoPosition, i.worldPos, i.camPos,
+						_NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementStrength);
+
+					// View Space
+					UNITY_BRANCH
+					if (_NormalVectorDisplacementCoordinateSpace == 0)
+					{
+						finishedWorldPos.xyz += normalDisplacement;
+
+						// Update world pos to match our new modified world axis position.
+						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
+						i.worldPos.xyz += i.camPos;
+					}
+					// World Space
+					else
+					{
+						i.worldPos.xyz += normalDisplacement;
 
 						// The world axis aligned position (finishedWorldPos) is utilized for some effects like image overlay
 						// and vignette, so we need to propogate the world space displacement backwards.

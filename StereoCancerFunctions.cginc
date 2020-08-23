@@ -583,6 +583,28 @@ float3 colorVectorDisplacement(sampler2D textureHandle, float4 stereoPosition, f
 	return colorDirectionVector * displacementStrength;
 }
 
+float3 normalVectorDisplacement(sampler2D textureHandle, float4 stereoPosition, float4 worldCoordinates, float3 cameraPosition, float coordinateSpace, float displacementStrength)
+{
+	// _CameraDepthNormalsTexture doesn't seem to be accessible with forward rendering, so we must
+	// reconstruct the normals using the depth texture
+	float depth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, stereoPosition);
+	depth = DECODE_EYEDEPTH(depth);
+
+	float3 toWorldPosDir = normalize(worldCoordinates.xyz - cameraPosition);
+	float3 depthWorldPos = cameraPosition + toWorldPosDir * depth;
+
+	// View Space
+	UNITY_BRANCH
+	if (coordinateSpace == 0)
+		depthWorldPos = mul(UNITY_MATRIX_V, depthWorldPos);
+
+	// https://wickedengine.net/2019/09/22/improved-normal-reconstruction-from-depth/
+	float3 normal = normalize(cross(ddx(depthWorldPos), ddy(depthWorldPos)));
+	normal *= displacementStrength;
+
+	return normal;
+}
+
   /////////////////////
  // Color functions //
 /////////////////////
