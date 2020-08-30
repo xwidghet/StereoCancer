@@ -203,12 +203,16 @@
 
 		_NormalVectorDisplacementStrength("Normal Vector Displacement Strength", Float) = 0
 		[Enum(View, 0, World, 1)] _NormalVectorDisplacementCoordinateSpace("Normal Vector Displacement Coordinate Space", Float) = 1
+		[Enum(Low, 0, High, 1)] _NormalVectorDisplacementQuality("Normal Vector Displacement Quality", Float) = 1
 
 		// Screen color effects
 		[Header(Screen Color Effects)]
 		_SignalNoiseSize("Signal Noise Size", Float) = 0
 		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
+
+		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 42)) = 30
+		_BlurMovementOpacity("Blur Movement Opacity", Float) = 0
 
 		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
 		_ChromaticAbberationSeparation("Chromatic Abberation Separation", Float) = 1.5
@@ -327,6 +331,7 @@
 			float4 _stereoCancerTexture_TexelSize;
 
 			sampler2D _CameraDepthTexture;
+			float4 _CameraDepthTexture_TexelSize;
 
 			float _CancerOpacity;
 
@@ -377,6 +382,7 @@
 
 			float _NormalVectorDisplacementStrength;
 			float _NormalVectorDisplacementCoordinateSpace;
+			float _NormalVectorDisplacementQuality;
 
 			float _WarpIntensity;
 			float _WarpAngle;
@@ -493,6 +499,9 @@
 			float _ImaginaryColorBlendMode;
 			float _ImaginaryColorOpacity;
 			float _ImaginaryColorAngle;
+
+			float _BlurMovementSampleCount;
+			float _BlurMovementOpacity;
 
 			float _ChromaticAbberationStrength;
 			float _ChromaticAbberationSeparation;
@@ -645,6 +654,13 @@
 				
 				// Vector from the 'camera' to the world-axis aligned worldPos.
 				float3 worldVector = normalize(i.worldPos);
+
+				// Store the starting position to allow for things like using the
+				// derivative (ddx, ddy) to calculate nearby positions to sample depth.
+				float4 startingAxisAlignedPos = i.worldPos;
+				float4 startingWorldPos = startingAxisAlignedPos;
+				startingWorldPos.xyz = mul(i.inverseViewMatRot, startingWorldPos.xyz);
+				startingWorldPos.xyz += i.camPos;
 
 				// Default world-axis values for usage with axis-based effects
 				const float3 axisFront = float3(0, 0, -1);
@@ -987,8 +1003,11 @@
 				UNITY_BRANCH
 				if (_NormalVectorDisplacementStrength != 0)
 				{
-					float3 normalDisplacement = normalVectorDisplacement(_CameraDepthTexture, stereoPosition, i.worldPos, i.camPos,
-						_NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementStrength);
+					float3 normalDisplacement = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
+						i.worldPos, startingAxisAlignedPos, i.camPos, i.camRight, i.camUp, _NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementStrength, _NormalVectorDisplacementQuality);
+
+					// Debug normals
+					//return float4(normalDisplacement, 1);
 
 					// View Space
 					UNITY_BRANCH
@@ -1231,6 +1250,9 @@
 					else if (_ImaginaryColorBlendMode == 2)
 						bgcolor.rgb += bgcolor.rgb*imaginaryColor;
 				}
+
+				if (_BlurMovementOpacity != 0)
+					bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount, _BlurMovementOpacity);
 
 				// Check opacity and override since the user may be intentionally
 				// removing the color channel.

@@ -310,6 +310,19 @@ float gold_noise(float2 coordinate, float seed)
     return frac(sin(dot(temp, temp2))*SRT);
 }
 
+// https://catlikecoding.com/unity/tutorials/flow/looking-through-water/
+float2 AlignWithGrabTexel(float4 texelSize, float2 uv) {
+#if UNITY_UV_STARTS_AT_TOP
+	if (texelSize.y < 0) {
+		uv.y = 1 - uv.y;
+	}
+#endif
+
+	return
+		(floor(uv * texelSize.zw) + 0.5) *
+		abs(texelSize.xy);
+}
+
 // Triangular probability distribution function
 // Assumes input is between 0 and 1
 //
@@ -335,6 +348,81 @@ float angleToWorldCoordinate(float4 worldCoordinates, float3 camFront)
 	float3 worldVector = normalize(worldCoordinates - _WorldSpaceCameraPos);
 
 	return(acos(dot(worldVector, camFront)));
+}
+
+float2 reverseTransformStereoScreenSpaceTex(float2 uv, float w)
+{
+	// Original forward version from UnityCG.cginc
+	/*
+	float4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
+	return uv.xy * scaleOffset.xy + scaleOffset.zw * w;
+	*/
+#ifdef UNITY_SINGLE_PASS_STEREO
+	float4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
+
+	uv -= (scaleOffset.zw * w);
+	uv = (uv.xy / scaleOffset.xy);
+#endif
+
+	return uv;
+}
+
+
+float4 reverseComputeGrabScreenPos(float4 grabScreenPos)
+{
+	// Original forward version from UnityCG.cginc
+	/*
+#if UNITY_UV_STARTS_AT_TOP
+	float scale = -1.0;
+	#else
+	float scale = 1.0;
+	#endif
+	float4 o = pos * 0.5f;
+	o.xy = float2(o.x, o.y*scale) + o.w;
+#ifdef UNITY_SINGLE_PASS_STEREO
+	o.xy = TransformStereoScreenSpaceTex(o.xy, pos.w);
+#endif
+	o.zw = pos.zw;
+	return o;
+	*/
+
+	float4 o = grabScreenPos;
+
+#ifdef UNITY_SINGLE_PASS_STEREO
+	o.xy = reverseTransformStereoScreenSpaceTex(o.xy, grabScreenPos.w);
+#endif
+
+#if UNITY_UV_STARTS_AT_TOP
+	float scale = -1.0;
+#else
+	float scale = 1.0;
+#endif
+
+	o.xy -= o.w*0.5f;
+	o.xy = float2(o.x, o.y/scale);
+
+	o.xy *= 2;
+
+	return o;
+}
+
+float4 reverseComputeNonStereoScreenPos(float4 pos) {
+	// Original forward version from UnityCG.cginc
+	/*
+	float4 o = pos * 0.5f;
+	o.xy = float2(o.x, o.y*_ProjectionParams.x) + o.w;
+	o.zw = pos.zw;
+	return o;
+	*/
+	
+	float4 o = pos;
+
+	o.xy -= o.w*0.5f;
+	o.xy = float2(o.x, o.y / _ProjectionParams.x);
+
+	o.xy *= 2.f;
+
+	return o;
 }
 
 // End xwidghet helpers

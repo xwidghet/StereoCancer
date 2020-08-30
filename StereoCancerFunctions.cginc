@@ -583,23 +583,125 @@ float3 colorVectorDisplacement(sampler2D textureHandle, float4 stereoPosition, f
 	return colorDirectionVector * displacementStrength;
 }
 
-float3 normalVectorDisplacement(sampler2D textureHandle, float4 stereoPosition, float4 worldCoordinates, float3 cameraPosition, float coordinateSpace, float displacementStrength)
+// A world-space implementation of the solutions described from the following link
+// for computing normal vectors in screen-space using depth:
+// https://wickedengine.net/2019/09/22/improved-normal-reconstruction-from-depth/
+//
+// This is a workaround for not having _CameraDepthNormalsTexture in forward rendering.
+float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float4 stereoPosition, float4 worldCoordinates, float4 startingWorldPos, float3 cameraPosition, float3 axisRight, float3 axisUp,
+	float coordinateSpace, float displacementStrength, float quality)
 {
-	// _CameraDepthNormalsTexture doesn't seem to be accessible with forward rendering, so we must
-	// reconstruct the normals using the depth texture
-	float depth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, stereoPosition);
-	depth = DECODE_EYEDEPTH(depth);
+	float3 normal = float3(0, 0, 0);
 
-	float3 toWorldPosDir = normalize(worldCoordinates.xyz - cameraPosition);
-	float3 depthWorldPos = cameraPosition + toWorldPosDir * depth;
-
-	// View Space
 	UNITY_BRANCH
-	if (coordinateSpace == 0)
-		depthWorldPos = mul(UNITY_MATRIX_V, depthWorldPos);
+	// High
+	if (quality == 1)
+	{
+		// Running distortion effects before this runs will shift the world position
+		// away from texel centers, resulting in wildly incorrect triangle normals being
+		// generated when multiple samples sample the same depth point.
+		//
+		// Solution: Texel-aligned world positons combined with world position derivatives.
+		float4 centerPos = worldCoordinates;
+		
+		centerPos = mul(UNITY_MATRIX_VP, centerPos);
+		centerPos = ComputeGrabScreenPos(centerPos);
+	
+		centerPos.xy = AlignWithGrabTexel(texelSize, centerPos.xy / centerPos.w);
+		centerPos.xy *= centerPos.w;
 
-	// https://wickedengine.net/2019/09/22/improved-normal-reconstruction-from-depth/
-	float3 normal = normalize(cross(ddx(depthWorldPos), ddy(depthWorldPos)));
+		centerPos = reverseComputeGrabScreenPos(centerPos);
+		centerPos = mul(inverse(UNITY_MATRIX_VP), centerPos);
+
+		// Utilize the world position derivative to calculate nearby positions to sample depth
+		float2 worldPosDerivative = float2(-ddx(startingWorldPos.x), ddy(startingWorldPos.y));
+
+		float4 leftPos = float4(centerPos.xyz - axisRight * worldPosDerivative.x, centerPos.w);
+		float4 rightPos = float4(centerPos.xyz + axisRight * worldPosDerivative.x, centerPos.w);
+
+		float4 upPos = float4(centerPos.xyz + axisUp * worldPosDerivative.y, centerPos.w);
+		float4 downPos = float4(centerPos.xyz - axisUp * worldPosDerivative.y, centerPos.w);
+
+		float centerDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(centerPos));
+
+		float leftDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(leftPos));
+		float rightDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(rightPos));
+
+		float upDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(upPos));
+		float downDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(downPos));
+
+		centerDepth = DECODE_EYEDEPTH(centerDepth);
+		leftDepth = DECODE_EYEDEPTH(leftDepth);
+		rightDepth = DECODE_EYEDEPTH(rightDepth);
+		upDepth = DECODE_EYEDEPTH(upDepth);
+		downDepth = DECODE_EYEDEPTH(downDepth);
+
+		// Solve for the triangle which is the best fit
+		bool reverseOrder = false;
+
+		float3 toWorldPosDir = normalize(centerPos.xyz - cameraPosition);
+		float3 toPos1 = normalize(leftPos.xyz - cameraPosition);
+		float3 toPos2 = normalize(upPos.xyz - cameraPosition);
+
+		float3 p0 = cameraPosition + toWorldPosDir * centerDepth;
+		float3 p1 = cameraPosition + toPos1 * leftDepth;
+		float3 p2 = cameraPosition + toPos2 * upDepth;
+		
+		if (abs(rightDepth - centerDepth) < abs(leftDepth - centerDepth))
+		{
+			toPos1 = normalize(rightPos.xyz - cameraPosition);
+			p1 = cameraPosition + toPos1 * rightDepth;
+
+			reverseOrder = true;
+		}
+
+		if (abs(downDepth - centerDepth) < abs(upDepth - centerDepth))
+		{
+			toPos2 = normalize(downPos.xyz - cameraPosition);
+			p2 = cameraPosition + toPos2 * downDepth;
+
+			// When we have flipped only the up vertex we need reverse order
+			// and when we half flipped both left and up vertices we need normal order
+			reverseOrder = !reverseOrder;
+		}
+
+		// Need to correct the triangle vertex order if we have swapped
+		// the positions of the vertices
+		if (reverseOrder)
+		{
+			float3 tmp = p1;
+			p1 = p2;
+			p2 = tmp;
+		}
+
+		// View Space
+		UNITY_BRANCH
+		if (coordinateSpace == 0)
+		{
+			p0 = mul(UNITY_MATRIX_V, p0);
+			p1 = mul(UNITY_MATRIX_V, p1);
+			p2 = mul(UNITY_MATRIX_V, p2);
+		}
+
+		normal = normalize(cross(p2 - p0, p1 - p0));
+	}
+	// Low
+	else
+	{
+		float depth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, stereoPosition);
+		depth = DECODE_EYEDEPTH(depth);
+
+		float3 toWorldPosDir = normalize(worldCoordinates.xyz - cameraPosition);
+		float3 depthWorldPos = cameraPosition + toWorldPosDir * depth;
+
+		// View Space
+		UNITY_BRANCH
+		if (coordinateSpace == 0)
+			depthWorldPos = mul(UNITY_MATRIX_V, depthWorldPos);
+		
+		normal = normalize(cross(ddx(depthWorldPos), ddy(depthWorldPos)));
+	}
+	
 	normal *= displacementStrength;
 
 	return normal;
@@ -620,6 +722,38 @@ half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripe
 		bgColor *= half4(stripeColor.rgb * stripeColor.a, 1.0);
 
 	return bgColor;
+}
+
+half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount, float opacity)
+{
+	float3 color = float3(0, 0, 0);
+
+	float3 blurMove = (finalWorldCoordinates.xyz - startingWorldCoordinates.xyz) / sampleCount;
+	float movementDistance = length(blurMove);
+
+	UNITY_BRANCH
+	// No point sampling up to 42 times if the result is the same as just sampling the screen once.
+	if (movementDistance < 0.0000001)
+		return tex2Dproj(backgroundTexture, computeStereoUV(finalWorldCoordinates)).rgb * opacity;
+
+	// Accumulate attenuation to separate movement distance
+	// and sample count from effect brightness.
+	float accumulatedAttenuation = 0;
+
+	UNITY_LOOP
+	for (float q = 0; q < sampleCount; q++)
+	{
+		float4 samplePos = finalWorldCoordinates;
+		samplePos.xyz += blurMove * q;
+		float attenuation = (distance(samplePos, startingWorldCoordinates)) / movementDistance;
+		attenuation *= attenuation;
+
+		accumulatedAttenuation += attenuation;
+
+		color.rgb += tex2Dproj(backgroundTexture, computeStereoUV(samplePos)).rgb*attenuation;
+	}
+
+	return (color.rgb * opacity) / accumulatedAttenuation;
 }
 
 half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation)
