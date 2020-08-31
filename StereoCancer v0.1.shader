@@ -561,11 +561,15 @@
 			{
 				v2f o;
 
-				// I could normalize camFront, or I could just live dangerously
+				// I could normalize the direction vectors, or I could just live dangerously
 				// with reckless abandon to save insignificant amounts of performance.
+				//
+				// Note: This does not utilize cross products to avoid the issue where
+				//		 at certain rotations the Up and Right vectors will flip.
+				//		 (Roll of +-30 degrees and +-90 degrees).
 				o.camFront = mul((float3x3)unity_CameraToWorld, float3(0, 0, 1));
-				o.camRight = normalize(cross(o.camFront, float3(0.0, 1.0, 0.0)));
-				o.camUp = normalize(cross(o.camFront, o.camRight));
+				o.camUp = mul((float3x3)unity_CameraToWorld, float3(0, 1, 0));
+				o.camRight = mul((float3x3)unity_CameraToWorld, float3(1, 0, 0));
 
 				o.viewMatRot = extract_rotation_matrix(UNITY_MATRIX_V);
 				o.inverseViewMatRot = transpose(o.viewMatRot);
