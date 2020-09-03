@@ -54,6 +54,11 @@
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
 
+		// VR Effects
+		[Header(Virtual Reality Effects)]
+		_EyeConvergence("Eye Convergence", Range(-3.1415926, 3.1415926)) = 0
+		_EyeSeparation("Eye Separation", Float) = 0
+
 		[Header(Screen Distortion Effects)]
 		_ShrinkWidth("Shrink Width", Float) = 0
 		_ShrinkHeight("Shrink Height", Float) = 0
@@ -212,7 +217,8 @@
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
 
 		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 42)) = 30
-		_BlurMovementOpacity("Blur Movement Opacity", Float) = 0
+		_BlurMovementTarget("Blur Movement Target", Range(0, 1)) = 0.5
+		_BlurMovementOpacity("Blur Movement Opacity", Range(0, 1)) = 0
 
 		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
 		_ChromaticAbberationSeparation("Chromatic Abberation Separation", Float) = 1.5
@@ -338,6 +344,9 @@
 			// Screen distortion params
 			float _ShrinkWidth;
 			float _ShrinkHeight;
+
+			float _EyeConvergence;
+			float _EyeSeparation;
 
 			float _RotationX;
 			float _RotationY;
@@ -501,6 +510,7 @@
 			float _ImaginaryColorAngle;
 
 			float _BlurMovementSampleCount;
+			float _BlurMovementTarget;
 			float _BlurMovementOpacity;
 
 			float _ChromaticAbberationStrength;
@@ -682,8 +692,19 @@
 				//		 know how many effects I will add yet, and don't want to have to
 				//		 remove parameters users are using to make space for effects.
 
+				  ////////////////////////////////////
+				 // Apply Virtual Reality Effects ///
+				////////////////////////////////////
+				UNITY_BRANCH
+				if (_EyeConvergence != 0)
+					i.worldPos = stereoEyeConvergence(i.worldPos, axisUp, _EyeConvergence);
+
+				UNITY_BRANCH
+				if(_EyeSeparation != 0)
+					i.worldPos = stereoEyeSeparation(i.worldPos, axisRight, _EyeSeparation);
+
 				  //////////////////////////////////////////
-				 // Apply world-space distortion effects //
+				 // Apply World-Space Distortion Effects //
 				//////////////////////////////////////////
 				UNITY_BRANCH
 				if (_ShrinkHeight != 0)
@@ -957,13 +978,6 @@
 				if (clearPixel && _MemeTexOverrideMode != 2)
 					return half4(0, 0, 0, _CancerOpacity);
 
-				// Initialize color now so we can apply signal noise in default world-axis space
-				half4 bgcolor = half4(0, 0, 0, 0);
-
-				UNITY_BRANCH
-				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
-					bgcolor.rgb += signalNoise(i.worldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
-
 				// Shift world pos back from its current axis-aligned position to
 				// the position it should be in-front of the camera.
 				float4 finishedWorldPos = i.worldPos;
@@ -1051,8 +1065,10 @@
 					stereoPosition = wrapUVCoordinates(stereoPosition);
 
 				  /////////////////////////
-				 // Apply color effects //
+				 // Apply Color Effects //
 			    /////////////////////////
+
+				half4 bgcolor = half4(0, 0, 0, 0);
 
 				// No point in sampling background color if the user is going to override it
 				// anyway.
@@ -1061,11 +1077,17 @@
 				{
 					if (_ChromaticAbberationStrength != 0)
 						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength, _ChromaticAbberationSeparation);
+					else if (_BlurMovementOpacity != 0)
+						bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount, _BlurMovementTarget, _BlurMovementOpacity);
 					else
 						bgcolor += tex2Dproj(_stereoCancerTexture, stereoPosition);
 
 					bgcolor *= _ColorMask;
 				}
+
+				UNITY_BRANCH
+				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
+					bgcolor.rgb += signalNoise(finishedWorldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
 
 				UNITY_BRANCH
 				if (_EdgelordStripeSize != 0)
@@ -1254,9 +1276,6 @@
 					else if (_ImaginaryColorBlendMode == 2)
 						bgcolor.rgb += bgcolor.rgb*imaginaryColor;
 				}
-
-				if (_BlurMovementOpacity != 0)
-					bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount, _BlurMovementOpacity);
 
 				// Check opacity and override since the user may be intentionally
 				// removing the color channel.

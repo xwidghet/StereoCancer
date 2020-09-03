@@ -52,6 +52,26 @@ bool mirrorCheck(float cancerDisplayMode)
 	return (cancerDisplayMode == 1 && !isMirror) || (cancerDisplayMode == 0 && isMirror);
 }
 
+  //////////////////////////////
+ // Virtual Reality Effects ///
+//////////////////////////////
+
+float4 stereoEyeConvergence(float4 worldCoordinates, float3 axisUp, float convergence)
+{
+	float angle = convergence - 2 * step(1, unity_StereoEyeIndex)*convergence;
+	worldCoordinates.xyz = mul(rotAxis(axisUp, angle), worldCoordinates.xyz);
+
+	return worldCoordinates;
+}
+
+float4 stereoEyeSeparation(float4 worldCoordinates, float3 axisRight, float separation)
+{
+	float offset = separation - 2* step(1, unity_StereoEyeIndex)*separation;
+	worldCoordinates.xyz += axisRight * offset;
+
+	return worldCoordinates;
+}
+
   ///////////////////////////
  // Distortion functions ///
 ///////////////////////////
@@ -724,36 +744,47 @@ half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripe
 	return bgColor;
 }
 
-half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount, float opacity)
+half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount, float targetPoint, float opacity)
 {
 	float3 color = float3(0, 0, 0);
 
-	float3 blurMove = (finalWorldCoordinates.xyz - startingWorldCoordinates.xyz) / sampleCount;
+	float3 blurMove = finalWorldCoordinates.xyz - startingWorldCoordinates.xyz;
 	float movementDistance = length(blurMove);
+
+	float3 centerPoint = lerp(startingWorldCoordinates.xyz, finalWorldCoordinates.xyz, targetPoint);
+
+	// Convert movement vector to sample step distance.
+	blurMove /= sampleCount;
+
+	half3 backgroundColor = tex2Dproj(backgroundTexture, computeStereoUV(finalWorldCoordinates)).rgb;
 
 	UNITY_BRANCH
 	// No point sampling up to 42 times if the result is the same as just sampling the screen once.
 	if (movementDistance < 0.0000001)
-		return tex2Dproj(backgroundTexture, computeStereoUV(finalWorldCoordinates)).rgb * opacity;
+		return backgroundColor;
 
 	// Accumulate attenuation to separate movement distance
 	// and sample count from effect brightness.
 	float accumulatedAttenuation = 0;
 
 	UNITY_LOOP
-	for (float q = 0; q < sampleCount; q++)
+	for (int q = 0; q < sampleCount; q++)
 	{
-		float4 samplePos = finalWorldCoordinates;
-		samplePos.xyz += blurMove * q;
-		float attenuation = (distance(samplePos, startingWorldCoordinates)) / movementDistance;
-		attenuation *= attenuation;
-
-		accumulatedAttenuation += attenuation;
+		float4 samplePos = startingWorldCoordinates + float4(blurMove, 0)*q;
+		float attenuation = 0;
+		
+		// Todo: Figure out an algorithm to avoid needing to fallback to vector math
+		//       for targets closer to the starting position than the halfway point.
+		if(targetPoint >= 0.5)
+			attenuation = 1.0 - abs(targetPoint - (float)q / sampleCount) / targetPoint;
+		else
+			attenuation = (1.0 - targetPoint) - clamp(length(samplePos.xyz - centerPoint) / (movementDistance), 0, 1);
 
 		color.rgb += tex2Dproj(backgroundTexture, computeStereoUV(samplePos)).rgb*attenuation;
+		accumulatedAttenuation += attenuation;
 	}
 
-	return (color.rgb * opacity) / accumulatedAttenuation;
+	return lerp(backgroundColor, (color.rgb) / accumulatedAttenuation, opacity);
 }
 
 half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation)
