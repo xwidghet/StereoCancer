@@ -731,6 +731,41 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
  // Color functions //
 /////////////////////
 
+half4 stereoImageOverlay(float4 axisCoordinates, float3 cameraPosition, float3 camFront,
+	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize, 
+	float opacity, float clampUV, float cutoutUV, float screenOverrideMode, inout bool dropMemePixels)
+{
+	// Apply Tiling
+	axisCoordinates.xy *= memeImage_ST.xy;
+
+	// Stretch our coordinates to match the aspect ratio of the image
+	// being overlayed.
+	axisCoordinates.x *= memeImage_TexelSize.w / memeImage_TexelSize.z;
+
+	// Interpret axis-aligned coordinates as UV coordinates
+	float2 uv = axisCoordinates.xy / 50.0;
+
+	uv.x = -uv.x;
+	uv += 0.5;
+
+	// Apply Offset
+	uv += memeImage_ST.zw / 100;
+
+	dropMemePixels = false;
+	if (cutoutUV)
+	{
+		float2 pxCoordinates = uv * memeImage_TexelSize.zw;
+		if (pxCoordinates.x > memeImage_TexelSize.z-1 || pxCoordinates.x < 1 || pxCoordinates.y > memeImage_TexelSize.w-1 || pxCoordinates.y < 1)
+			dropMemePixels = true;
+	}
+	if (clampUV)
+	{
+		uv = clamp(uv, 0, 1);
+	}
+
+	return tex2D(memeImage, uv.xy) * opacity;
+}
+
 // I wonder if this naming scheme will trigger any shader 'edgelords'
 half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripeSize, float offset)
 {
@@ -787,23 +822,33 @@ half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates,
 	return lerp(backgroundColor, (color.rgb) / accumulatedAttenuation, opacity);
 }
 
-half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation)
+half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation, float shape)
 {
-	float3 abberationVector = worldCoordinates.xyz - _WorldSpaceCameraPos;
-	abberationVector = normalize(abberationVector);
-
-	float angleToWorldVector = acos(dot(abberationVector, camFront));
-	angleToWorldVector = abs(angleToWorldVector) / UNITY_PI;
-	
 	float4 redAbberationPos = worldCoordinates;
 	float4 greenAbberationPos = worldCoordinates;
 	float4 blueAbberationPos = worldCoordinates;
 
-	// Emulate camera lense distortion by applying different fish-eye lense intensity
-	// effects to each channel. Doesn't utilize stereoFishEye to avoid redundant work.
-	redAbberationPos.xyz += camFront * (angleToWorldVector * 10.0 * strength);
-	greenAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation) * strength);
-	blueAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation*2) * strength);
+	// Spherical
+	if (shape == 0)
+	{
+		// Emulate camera lense distortion by applying different fish-eye lense intensity
+		// effects to each channel. Doesn't utilize stereoFishEye to avoid redundant work.
+		float3 abberationVector = worldCoordinates.xyz - _WorldSpaceCameraPos;
+		abberationVector = normalize(abberationVector);
+
+		float angleToWorldVector = acos(dot(abberationVector, camFront));
+		angleToWorldVector = abs(angleToWorldVector) / UNITY_PI;
+
+		redAbberationPos.xyz += camFront * (angleToWorldVector * 10.0 * strength);
+		greenAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation) * strength);
+		blueAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation * 2) * strength);
+	}
+	// Flat
+	else
+	{
+		greenAbberationPos.xyz -= camFront * (separation) * strength;
+		blueAbberationPos.xyz += camFront * (separation) * strength;
+	}
 
 	redAbberationPos = computeStereoUV(redAbberationPos);
 	greenAbberationPos = computeStereoUV(greenAbberationPos);

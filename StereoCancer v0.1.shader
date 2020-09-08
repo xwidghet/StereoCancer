@@ -48,7 +48,6 @@
 		[Header(Image Overlay Effects)]
 		_MemeTex("Meme Image (RGB)", 2D) = "white" {}
 		_MemeTexOpacity("Meme Opacity", Float) = 0
-		_MemeTexZoom("Meme Zoom (Zoom In+/Zoom Out-)", Float) = 0
 		_MemeTexClamp("Meme Clamp", Int) = 0
 		_MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
@@ -222,6 +221,7 @@
 
 		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
 		_ChromaticAbberationSeparation("Chromatic Abberation Separation", Float) = 1.5
+		[Enum(Spherical, 0, Flat, 1)] _ChromaticAbberationShape("Chromatic Abberation Shape", Float) = 0
 
 		_CircularVignetteColor("Circular Vignette Color", Color) = (0, 0, 0, 1)
 		_CircularVignetteOpacity("Circular Vignette Opacity", Range(0, 1)) = 0
@@ -327,7 +327,6 @@
 			float4 _MemeTex_TexelSize;
 			float4 _MemeTex_ST;
 			float _MemeTexOpacity;
-			float _MemeTexZoom;
 			int _MemeTexClamp;
 			int _MemeTexCutOut;
 			float _MemeTexAlphaCutOff;
@@ -515,6 +514,7 @@
 
 			float _ChromaticAbberationStrength;
 			float _ChromaticAbberationSeparation;
+			float _ChromaticAbberationShape;
 
 			float _SignalNoiseSize;
 			float _ColorizedSignalNoise;
@@ -1076,7 +1076,7 @@
 				if (_colorSkewROverride == 0 || _colorSkewGOverride == 0 || _colorSkewBOverride == 0)
 				{
 					if (_ChromaticAbberationStrength != 0)
-						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength, _ChromaticAbberationSeparation);
+						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength, _ChromaticAbberationSeparation, _ChromaticAbberationShape);
 					else if (_BlurMovementOpacity != 0)
 						bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount, _BlurMovementTarget, _BlurMovementOpacity);
 					else
@@ -1096,135 +1096,17 @@
 					bgcolor = edgelordStripes(edgelordUV, bgcolor, _EdgelordStripeColor, _EdgelordStripeSize, _EdgelordStripeOffset);
 				}
 
-				// This feature is not in a function as it will discard the current fragment
-				// if the user has chosen to completely override the background color, and I
-				// don't want that hidden.
 				UNITY_BRANCH
-				if (_MemeTexOpacity != 0)
+				if(_MemeTexOpacity != 0)
 				{
-					float4 memePosition = finishedWorldPos;
-
-					// Apply zoom to let user adjust depth
-					memePosition.xyz += axisFront * _MemeTexZoom;
-
-					// Apply tiling
-					memePosition.xy *= _MemeTex_ST.xy;
-
-					// Convert to stereo position and calculate UV coordinates.
-					memePosition.xyz = mul(i.inverseViewMatRot, memePosition.xyz);
-					memePosition.xyz += _WorldSpaceCameraPos;
-
-					memePosition = computeStereoUV(memePosition);
-
-					float2 screenUV = (memePosition.xyz / memePosition.w).xy;
-					float offset = 0;
-
-#ifdef UNITY_SINGLE_PASS_STEREO
-					// Convert UV coordinates to eye-specific 0-1 coordiantes
-					offset = 0.5 * step(1, unity_StereoEyeIndex);
-					float min = offset;
-					float max = 0.5 + offset;
-
-					float uvDist = max - min;
-					screenUV.x = (screenUV.x - min) / uvDist;
-#endif
-					// Shift UV to the range (-0.5, 0.5) to allow for simpler
-					// scaling math.
-					screenUV -= 0.5;
-
-					// Use Valve Index as standard FOV scale
-					// https://docs.google.com/spreadsheets/d/1q7Va5Q6iU40CGgewoEqRAeypUa1c0zZ86mqR8uIyDeE/edit#gid=0
-					screenUV *= getCameraFOV() / 103.6;
-
-					// Ensure the image doesn't get stretched or squished
-					// depending on the users HMD/Display aspect ratio.
-					float screenWidth = _ScreenParams.x;
-					float screenHeight = _ScreenParams.y;
-
-#ifdef UNITY_SINGLE_PASS_STEREO
-					// Ooga, Booga.
-					screenWidth *= 2;
-
-					// Make image depth independent of image ratio.
-					// Todo: Figure out math to separate depth from Tiling image scaling.
-					float textureWidth = _MemeTex_TexelSize.z;
-					float constraint = ((1.0 - textureWidth / 1024.0) / 8);
-					screenUV.x -= (1 - 2*unity_StereoEyeIndex) * constraint;
-
-					if (constraint > 0)
-						screenUV *= (1.0 - constraint / 4);
-					else
-						screenUV *= (1.0 - constraint / 16);
-						
-#endif
-					float ratioX = 1.0 / (screenWidth / _MemeTex_TexelSize.z);
-					float ratioY = 1.0 / (screenHeight / _MemeTex_TexelSize.w);
-					screenUV.x /= ratioX;
-					screenUV.y /= ratioY;
-
-					// Normalize image scale with respect to Valve Index 100% SS (2016x2240)
-					//
-					// This prevents HMD rendering resolutions and Super Sampling values
-					// changing the image scale.
-					float normalizationScaler = 2240 / screenHeight;
-					screenUV *= normalizationScaler;
-
-					// Move back to correct coordinate space
-					// and apply offset
-					screenUV += 0.5;
-					screenUV += _MemeTex_ST.zw;
-
 					bool dropMemePixels = false;
-					if (_MemeTexCutOut != 0)
-					{
-						// Exclude the edge pixels when doing _MemeTexCutOut
-						// to prevent bilinear sampling artifacts at the image border.
-						if (screenUV.y < 0.001 || screenUV.y > 0.999)
-							dropMemePixels = true;
-
-						if (offset != 0)
-						{
-							if (screenUV.x < -0.999 || screenUV.x > 0.999)
-								dropMemePixels = true;
-						}
-						else
-						{
-							float maxUV = 0.999;
-
-#ifdef UNITY_SINGLE_PASS_STEREO
-							maxUV = 1.999;
-#endif
-
-							if (screenUV.x < 0.001 || screenUV.x > maxUV)
-								dropMemePixels = true;
-						}
-					}
-
-					if (_MemeTexClamp != 0)
-					{
-						screenUV.y = clamp(screenUV.y, 0, 1);
-
-						if (offset != 0)
-							screenUV.x = clamp(screenUV.x, -1, 1);
-						else
-						{
-							float maxUV = 1;
-#ifdef UNITY_SINGLE_PASS_STEREO
-							maxUV = 2;
-#endif
-							screenUV.x = clamp(screenUV.x, 0, maxUV);
-						}
-					}
-
-#ifdef UNITY_SINGLE_PASS_STEREO
-					// Convert the eye-specific 0-1 coordinates back to 0-1 UV coordinates
-					screenUV.x = (screenUV.x * uvDist) + min;
-#endif
+					half4 memeColor = stereoImageOverlay(finishedWorldPos, i.camPos, axisFront,
+						_MemeTex, _MemeTex_ST, _MemeTex_TexelSize,
+						_MemeTexOpacity, _MemeTexClamp, _MemeTexCutOut,
+						_MemeTexOverrideMode, dropMemePixels);
 
 					if (dropMemePixels == false)
 					{
-						half4 memeColor = tex2D(_MemeTex, screenUV);
-
 						if (memeColor.a > _MemeTexAlphaCutOff)
 						{
 							// Override Background
