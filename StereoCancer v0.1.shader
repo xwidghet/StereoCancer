@@ -42,14 +42,14 @@
 		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
 
-		_ParticleSystem("Particle System", Int) = 0
+		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
 
 		// Image Effects
 		[Header(Image Overlay Effects)]
 		_MemeTex("Meme Image (RGB)", 2D) = "white" {}
 		_MemeTexOpacity("Meme Opacity", Float) = 0
-		_MemeTexClamp("Meme Clamp", Int) = 0
-		_MemeTexCutOut("Meme Cut Out", Int) = 0
+		[Enum(No,0, Yes,1)] _MemeTexClamp("Meme Clamp", Int) = 0
+		[Enum(No,0, Yes,1)] _MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
 
