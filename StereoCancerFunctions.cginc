@@ -731,16 +731,14 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
  // Color functions //
 /////////////////////
 
-half4 stereoImageOverlay(float4 axisCoordinates, float3 cameraPosition, float3 camFront,
-	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize, 
-	float opacity, float clampUV, float cutoutUV, float screenOverrideMode, inout bool dropMemePixels)
+float2 calculateUVFromAxisCoordinates(float4 axisCoordinates, float4 texture_ST, float4 texture_TexelSize)
 {
 	// Apply Tiling
-	axisCoordinates.xy *= memeImage_ST.xy;
+	axisCoordinates.xy *= texture_ST.xy;
 
 	// Stretch our coordinates to match the aspect ratio of the image
 	// being overlayed.
-	axisCoordinates.x *= memeImage_TexelSize.w / memeImage_TexelSize.z;
+	axisCoordinates.x *= texture_TexelSize.w / texture_TexelSize.z;
 
 	// Interpret axis-aligned coordinates as UV coordinates
 	float2 uv = axisCoordinates.xy / 50.0;
@@ -749,7 +747,17 @@ half4 stereoImageOverlay(float4 axisCoordinates, float3 cameraPosition, float3 c
 	uv += 0.5;
 
 	// Apply Offset
-	uv += memeImage_ST.zw / 100;
+	uv += texture_ST.zw / 100;
+
+	return uv;
+}
+
+float4 stereoImageOverlay(float4 axisCoordinates,
+	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize, 
+	int memeColumns, int memeRows, int memeCount, int memeIndex,
+	float opacity, float clampUV, float cutoutUV, inout bool dropMemePixels)
+{
+	float2 uv = calculateUVFromAxisCoordinates(axisCoordinates, memeImage_ST, memeImage_TexelSize);
 
 	dropMemePixels = false;
 	if (cutoutUV)
@@ -761,6 +769,19 @@ half4 stereoImageOverlay(float4 axisCoordinates, float3 cameraPosition, float3 c
 	if (clampUV)
 	{
 		uv = clamp(uv, 0, 1);
+	}
+
+	// Flipbook
+	if (memeColumns > 1 || memeRows > 1)
+	{
+		memeIndex = memeIndex % memeCount;
+
+		float2 imageStartingOffset = float2(memeIndex % memeColumns, 0);
+		imageStartingOffset.y = (memeIndex - imageStartingOffset.x) / memeRows - 1;
+
+		float2 memeIndexStepSize = rcp(float2(memeColumns, memeRows));
+
+		uv = imageStartingOffset*memeIndexStepSize + memeIndexStepSize * uv;
 	}
 
 	return tex2D(memeImage, uv.xy) * opacity;

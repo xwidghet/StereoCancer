@@ -44,25 +44,43 @@
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
 
+		// VR Effects
+		[Header(Virtual Reality Effects)]
+		_EyeConvergence("Eye Convergence", Range(-3.1415926, 3.1415926)) = 0
+		_EyeSeparation("Eye Separation", Float) = 0
+
 		// Image Effects
-		[Header(Image Overlay Effects)]
+		[Header(Image Overlay)]
 		_MemeTex("Meme Image (RGB)", 2D) = "white" {}
+		_MemeImageColumns("Meme Image Columns", Int) = 1
+		_MemeImageRows("Meme Image Rows", Int) = 1
+		_MemeImageCount("Meme Image Count", Int) = 1
+		_MemeImageIndex("Meme Image Index", Int) = 0
+		_MemeImageAngle("Meme Image Angle", Float) = 0
 		_MemeTexOpacity("Meme Opacity", Float) = 0
 		[Enum(No,0, Yes,1)] _MemeTexClamp("Meme Clamp", Int) = 0
 		[Enum(No,0, Yes,1)] _MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
 
-		// VR Effects
-		[Header(Virtual Reality Effects)]
-		_EyeConvergence("Eye Convergence", Range(-3.1415926, 3.1415926)) = 0
-		_EyeSeparation("Eye Separation", Float) = 0
+		// Displacement Map Map Displacement \\/
+		[Header(Displacement Map)]
+		_DisplacementMap("Displacement Map (RGB)", 2D) = "white" {}
+		[Enum(Normal,0, Color,1)] _DisplacementMapType("Displacement Map Type", Int) = 1
+		_DisplacementMapColumns("Displacement Map Columns", Int) = 1
+		_DisplacementMapRows("Displacement Map Rows", Int) = 1
+		_DisplacementMapCount("Displacement Map Count", Int) = 1
+		_DisplacementMapIndex("Displacement Map Index", Int) = 0
+		_DisplacementMapAngle("Displacement Map Angle", Float) = 0
+		_DisplacementMapIntensity("Displacement Map Intensity", Float) = 0
+		[Enum(No,0, Yes,1)] _DisplacementMapClamp("Displacement Map Clamp", Int) = 0
+		[Enum(No,0, Yes,1)] _DisplacementMapCutOut("Displacement Map Cut Out", Int) = 0
 
+		// Screen Distortion Effects
 		[Header(Screen Distortion Effects)]
 		_ShrinkWidth("Shrink Width", Float) = 0
 		_ShrinkHeight("Shrink Height", Float) = 0
-
-		// Screen Distortion Effects
+		
 		_RotationX("Rotation X (Pitch Down-/Up+)", Float) = 0
 		_RotationY("Rotation Y (Yaw Left-/Right+)", Float) = 0
 		_RotationZ("Rotation Z (Roll Left-/Right+)", Float) = 0
@@ -326,6 +344,11 @@
 			sampler2D _MemeTex;
 			float4 _MemeTex_TexelSize;
 			float4 _MemeTex_ST;
+			int _MemeImageColumns;
+			int _MemeImageRows;
+			int _MemeImageCount;
+			int _MemeImageIndex;
+			float _MemeImageAngle;
 			float _MemeTexOpacity;
 			int _MemeTexClamp;
 			int _MemeTexCutOut;
@@ -339,6 +362,19 @@
 			float4 _CameraDepthTexture_TexelSize;
 
 			float _CancerOpacity;
+
+			sampler2D _DisplacementMap;
+			float4 _DisplacementMap_TexelSize;
+			float4 _DisplacementMap_ST;
+			int _DisplacementMapType;
+			int _DisplacementMapColumns;
+			int	_DisplacementMapRows;
+			int	_DisplacementMapCount;
+			int	_DisplacementMapIndex;
+			float _DisplacementMapAngle;
+			float _DisplacementMapIntensity;
+			int _DisplacementMapClamp;
+			int _DisplacementMapCutOut;
 
 			// Screen distortion params
 			float _ShrinkWidth;
@@ -973,6 +1009,34 @@
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
 
+				// Apply displacement map after distortion effects so that it isn't just a static element.
+				UNITY_BRANCH
+				if (_DisplacementMapIntensity != 0)
+				{
+					float4 samplePosition = i.worldPos;
+					if (_DisplacementMapAngle != 0)
+						samplePosition.xyz = mul(rotAxis(axisFront, _DisplacementMapAngle), samplePosition.xyz);
+
+					bool dropDistortion = false;
+					half4 displacementVector = stereoImageOverlay(samplePosition,
+						_DisplacementMap, _DisplacementMap_ST, _DisplacementMap_TexelSize,
+						_DisplacementMapColumns, _DisplacementMapRows, _DisplacementMapCount, _DisplacementMapIndex,
+						1.0, _DisplacementMapClamp, _DisplacementMapCutOut,
+						dropDistortion);
+
+					// Interpret displacement map using the screen as a surface
+					// Red = Left-Right
+					// Green = Forward-Back
+					// Blue = Up-Down
+
+					// Normal Map
+					if (_DisplacementMapType == 0)
+						i.worldPos.xyz += (!dropDistortion)*UnpackNormal(displacementVector).xyz*_DisplacementMapIntensity;
+					// Color
+					else
+						i.worldPos.xyz += (!dropDistortion)*displacementVector.xzy*_DisplacementMapIntensity;
+				}
+
 				// Distortion effects which take the inout variable clearPixel create empty space, 
 				// so we can return now if we aren't filling the empty space (Override mode 2).
 				if (clearPixel && _MemeTexOverrideMode != 2)
@@ -1099,11 +1163,16 @@
 				UNITY_BRANCH
 				if(_MemeTexOpacity != 0)
 				{
+					float4 samplePosition = finishedWorldPos;
+					if (_MemeImageAngle != 0)
+						samplePosition.xyz = mul(rotAxis(axisFront, _MemeImageAngle), samplePosition.xyz);
+
 					bool dropMemePixels = false;
-					half4 memeColor = stereoImageOverlay(finishedWorldPos, i.camPos, axisFront,
+					half4 memeColor = stereoImageOverlay(samplePosition,
 						_MemeTex, _MemeTex_ST, _MemeTex_TexelSize,
+						_MemeImageColumns, _MemeImageRows, _MemeImageCount, _MemeImageIndex,
 						_MemeTexOpacity, _MemeTexClamp, _MemeTexCutOut,
-						_MemeTexOverrideMode, dropMemePixels);
+						dropMemePixels);
 
 					if (dropMemePixels == false)
 					{
