@@ -777,7 +777,7 @@ float4 stereoImageOverlay(float4 axisCoordinates,
 		memeIndex = memeIndex % memeCount;
 
 		float2 imageStartingOffset = float2(memeIndex % memeColumns, 0);
-		imageStartingOffset.y = (memeIndex - imageStartingOffset.x) / memeRows - 1;
+		imageStartingOffset.y = (memeRows - 1) - (memeIndex - (memeIndex % memeColumns)) / memeColumns;
 
 		float2 memeIndexStepSize = rcp(float2(memeColumns, memeRows));
 
