@@ -1024,6 +1024,8 @@
 						1.0, _DisplacementMapClamp, _DisplacementMapCutOut,
 						dropDistortion);
 
+					float displacementAmount = (!dropDistortion)*_DisplacementMapIntensity;
+
 					// Interpret displacement map using the screen as a surface
 					// Red = Left-Right
 					// Green = Forward-Back
@@ -1031,10 +1033,15 @@
 
 					// Normal Map
 					if (_DisplacementMapType == 0)
-						i.worldPos.xyz += (!dropDistortion)*UnpackNormal(displacementVector).xyz*_DisplacementMapIntensity;
+						i.worldPos.xyz += UnpackNormal(displacementVector).xyz*displacementAmount;
 					// Color
+					// Textures are 8 bits per color, so in order to have a '0' distortion value
+					// we need to calculate the origin from 127/255.
+					//
+					// Note: This assumes the user has unchecked the 'sRGB (Color Texture)' box
+					//		 for their texture.
 					else
-						i.worldPos.xyz += (!dropDistortion)*displacementVector.xzy*_DisplacementMapIntensity;
+						i.worldPos.xyz += (displacementVector.xzy - 0.4980392)*displacementAmount;
 				}
 
 				// Distortion effects which take the inout variable clearPixel create empty space, 
