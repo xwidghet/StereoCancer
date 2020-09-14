@@ -800,23 +800,30 @@ half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripe
 	return bgColor;
 }
 
-half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount, float targetPoint, float opacity)
+half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount,
+	float targetPoint, float pointAdjustmentStrength, float extrapolation, float opacity)
 {
 	float3 color = float3(0, 0, 0);
 
-	float3 blurMove = finalWorldCoordinates.xyz - startingWorldCoordinates.xyz;
-	float movementDistance = length(blurMove);
+	float startingAdjustment = clamp(targetPoint - pointAdjustmentStrength, -extrapolation, 1.0+extrapolation);
+	float endingAdjustment = clamp(targetPoint + pointAdjustmentStrength, -extrapolation, 1.0+extrapolation);
 
-	float3 centerPoint = lerp(startingWorldCoordinates.xyz, finalWorldCoordinates.xyz, targetPoint);
+	float4 startingPoint = lerp(startingWorldCoordinates, finalWorldCoordinates, startingAdjustment);
+	float4 endingPoint = lerp(startingWorldCoordinates, finalWorldCoordinates, endingAdjustment);
+
+	float3 targetPosition = lerp(startingPoint.xyz, endingPoint.xyz, targetPoint);
+
+	float3 blurMovementVec = endingPoint.xyz - startingPoint.xyz;
+	float totalMovementDistance = length(blurMovementVec);
 
 	// Convert movement vector to sample step distance.
-	blurMove /= sampleCount;
+	blurMovementVec /= sampleCount;
 
 	half3 backgroundColor = tex2Dproj(backgroundTexture, computeStereoUV(finalWorldCoordinates)).rgb;
 
 	UNITY_BRANCH
 	// No point sampling up to 42 times if the result is the same as just sampling the screen once.
-	if (movementDistance < 0.0000001)
+	if (totalMovementDistance < 0.000001)
 		return backgroundColor;
 
 	// Accumulate attenuation to separate movement distance
@@ -826,15 +833,8 @@ half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates,
 	UNITY_LOOP
 	for (int q = 0; q < sampleCount; q++)
 	{
-		float4 samplePos = startingWorldCoordinates + float4(blurMove, 0)*q;
-		float attenuation = 0;
-		
-		// Todo: Figure out an algorithm to avoid needing to fallback to vector math
-		//       for targets closer to the starting position than the halfway point.
-		if(targetPoint >= 0.5)
-			attenuation = 1.0 - abs(targetPoint - (float)q / sampleCount) / targetPoint;
-		else
-			attenuation = (1.0 - targetPoint) - clamp(length(samplePos.xyz - centerPoint) / (movementDistance), 0, 1);
+		float4 samplePos = float4(startingPoint.xyz + blurMovementVec*q, startingPoint.w);
+		float attenuation = 1.0 - distance(targetPosition.xyz, samplePos.xyz) / totalMovementDistance;
 
 		color.rgb += tex2Dproj(backgroundTexture, computeStereoUV(samplePos)).rgb*attenuation;
 		accumulatedAttenuation += attenuation;

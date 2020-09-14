@@ -235,6 +235,8 @@
 
 		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 42)) = 30
 		_BlurMovementTarget("Blur Movement Target", Range(0, 1)) = 0.5
+		_BlurMovementRange("Blur Movement Range", Range(0.001, 1)) = 1
+		_BlurMovementExtrapolation("Blur Movement Extrapolation", Range(0, 1)) = 0
 		_BlurMovementOpacity("Blur Movement Opacity", Range(0, 1)) = 0
 
 		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
@@ -546,6 +548,8 @@
 
 			float _BlurMovementSampleCount;
 			float _BlurMovementTarget;
+			float _BlurMovementRange;
+			float _BlurMovementExtrapolation;
 			float _BlurMovementOpacity;
 
 			float _ChromaticAbberationStrength;
@@ -1149,7 +1153,8 @@
 					if (_ChromaticAbberationStrength != 0)
 						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength, _ChromaticAbberationSeparation, _ChromaticAbberationShape);
 					else if (_BlurMovementOpacity != 0)
-						bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount, _BlurMovementTarget, _BlurMovementOpacity);
+						bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount,
+							_BlurMovementTarget, _BlurMovementRange, _BlurMovementExtrapolation, _BlurMovementOpacity);
 					else
 						bgcolor += tex2Dproj(_stereoCancerTexture, stereoPosition);
 
