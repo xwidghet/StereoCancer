@@ -338,7 +338,7 @@ float4 stereoRingRotation(float4 worldCoordinates,float3 camFront, float angle, 
 
 float4 stereoSpiral(float4 worldCoordinates, float3 camFront, float intensity)
 {
-	float3 worldVector = worldCoordinates - _WorldSpaceCameraPos;
+	float3 worldVector = worldCoordinates.xyz;
 	float dist = length(worldVector);
 	worldVector = normalize(worldVector);
 
@@ -351,7 +351,7 @@ float4 stereoSpiral(float4 worldCoordinates, float3 camFront, float intensity)
 
 float4 stereoFishEye(float4 worldCoordinates, float3 camFront, float intensity)
 {
-	float3 worldVector = worldCoordinates - _WorldSpaceCameraPos;
+	float3 worldVector = worldCoordinates.xyz;
 	float dist = length(worldVector);
 	worldVector = normalize(worldVector);
 
@@ -752,16 +752,21 @@ float2 calculateUVFromAxisCoordinates(float4 axisCoordinates, float4 texture_ST,
 	return uv;
 }
 
-float4 stereoImageOverlay(float4 axisCoordinates,
+float4 stereoImageOverlay(float4 axisCoordinates, float4 startingAxisAlignedPos,
 	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize, 
 	int memeColumns, int memeRows, int memeCount, int memeIndex,
 	float opacity, float clampUV, float cutoutUV, inout bool dropMemePixels)
 {
 	float2 uv = calculateUVFromAxisCoordinates(axisCoordinates, memeImage_ST, memeImage_TexelSize);
+	float2 startingUV = calculateUVFromAxisCoordinates(startingAxisAlignedPos, memeImage_ST, memeImage_TexelSize);
+	float2 imageSizeScaler = rcp(float2(memeColumns, memeRows));
 
 	dropMemePixels = false;
 	if (cutoutUV)
 	{
+		// Adjust texture size to match the final image size when texture atlases are in use.
+		memeImage_TexelSize.zw *= imageSizeScaler;
+
 		float2 pxCoordinates = uv * memeImage_TexelSize.zw;
 		if (pxCoordinates.x > memeImage_TexelSize.z-1 || pxCoordinates.x < 1 || pxCoordinates.y > memeImage_TexelSize.w-1 || pxCoordinates.y < 1)
 			dropMemePixels = true;
@@ -771,6 +776,8 @@ float4 stereoImageOverlay(float4 axisCoordinates,
 		uv = clamp(uv, 0, 1);
 	}
 
+	float2 ddScaler = float2(1.0, 1.0);
+
 	// Flipbook
 	if (memeColumns > 1 || memeRows > 1)
 	{
@@ -779,12 +786,12 @@ float4 stereoImageOverlay(float4 axisCoordinates,
 		float2 imageStartingOffset = float2(memeIndex % memeColumns, 0);
 		imageStartingOffset.y = (memeRows - 1) - (memeIndex - (memeIndex % memeColumns)) / memeColumns;
 
-		float2 memeIndexStepSize = rcp(float2(memeColumns, memeRows));
-
-		uv = imageStartingOffset*memeIndexStepSize + memeIndexStepSize * uv;
+		uv = imageStartingOffset*imageSizeScaler + imageSizeScaler*uv;
+		ddScaler *= imageSizeScaler;
 	}
 
-	return tex2D(memeImage, uv.xy) * opacity;
+	// Utilize ddx and ddy from the starting axis aligned coordiantes to resolve sampling artifacts when the texture wraps around.
+	return tex2D(memeImage, uv.xy, ddx(startingUV.x)*ddScaler.x, ddy(startingUV.y)*ddScaler.y) * opacity;
 }
 
 // I wonder if this naming scheme will trigger any shader 'edgelords'
@@ -854,7 +861,7 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 	{
 		// Emulate camera lense distortion by applying different fish-eye lense intensity
 		// effects to each channel. Doesn't utilize stereoFishEye to avoid redundant work.
-		float3 abberationVector = worldCoordinates.xyz - _WorldSpaceCameraPos;
+		float3 abberationVector = worldCoordinates.xyz;
 		abberationVector = normalize(abberationVector);
 
 		float angleToWorldVector = acos(dot(abberationVector, camFront));
@@ -877,6 +884,65 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 
 	return half4(tex2Dproj(abberationTexture, redAbberationPos).r, tex2Dproj(abberationTexture, greenAbberationPos).g,
 		tex2Dproj(abberationTexture, blueAbberationPos).b, 0);
+}
+
+half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sampler2D depthMap, float4 depthSamplePos, float3 camPos, float3 normal, float4 worldCoordinates, float4 startingAxisAlignedPos,
+	float offsetX, float offsetY, float offsetZ, float coordinateSource, float scale, float sharpness, float uvRange, bool sampleScreen)
+{
+	float sampleDepth = SAMPLE_DEPTH_TEXTURE_PROJ(depthMap, UNITY_PROJ_COORD(depthSamplePos));
+	sampleDepth = DECODE_EYEDEPTH(sampleDepth);
+
+	float3 samplePosition = float3(0, 0, 0);
+
+	// World Position
+	if (coordinateSource == 0)
+	{
+		float3 viewDirection = normalize(worldCoordinates.xyz - camPos);
+		samplePosition = camPos + viewDirection * sampleDepth;
+	}
+	// World Normal or View Normal
+	else
+		samplePosition = normal;
+
+	samplePosition.xyz += float3(offsetX, offsetY, offsetZ);
+	samplePosition /= scale;
+
+	// Weighting function from https://www.martinpalko.com/triplanar-mapping/
+	float3 blendWeights = pow(abs(normal), sharpness);
+	blendWeights = normalize(blendWeights);
+
+	// Center the UV coordinates based on the range requested
+	float offset = (1.0 - uvRange) * 0.5;
+	float2 uvOffset = float2(offset, offset);
+	float2 uvRangeMultiplier = float2(uvRange, uvRange);
+
+#ifdef UNITY_SINGLE_PASS_STEREO
+	// Squish and center the UVs in the left eye
+	if (sampleScreen)
+	{
+		uvRangeMultiplier.x *= 0.5;
+		uvOffset.x *= 0.5;
+	}
+#endif
+
+	// Note: Tiling and offset break hiding the VR Mask, but I see no reason
+	//		 to limit the user's 'artistic' design choices.
+
+	// Apply tiling
+	uvRangeMultiplier *= triplanarMap_ST.xy;
+
+	// Apply offset
+	uvOffset += triplanarMap_ST.zw;
+
+	// Use our (World Position or Normal) coordinates as UV coordinates, and swizzle them in an
+	// order which keeps the texture oriented right-side up on vertical walls.
+
+	// ddx and ddy are used to resolve sampling artifacts when the texture wraps around.
+	half3 colorX = tex2D(triplanarMap, frac(samplePosition.zy)*uvRangeMultiplier + uvOffset, ddx(samplePosition.z), ddy(samplePosition.y));
+	half3 colorY = tex2D(triplanarMap, frac(samplePosition.xz)*uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.z));
+	half3 colorZ = tex2D(triplanarMap, frac(samplePosition.xy)*uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.y));
+
+	return colorX*blendWeights.x + colorY*blendWeights.y + colorZ*blendWeights.z;
 }
 
 

@@ -76,6 +76,20 @@
 		[Enum(No,0, Yes,1)] _DisplacementMapClamp("Displacement Map Clamp", Int) = 0
 		[Enum(No,0, Yes,1)] _DisplacementMapCutOut("Displacement Map Cut Out", Int) = 0
 
+		// Triplanar Map
+		[Header(Triplanar Map)]
+		_TriplanarMap("Triplanar Map (RGB)", 2D) = "white" {}
+		[Enum(Map, 0, Screen, 1)]_TriplanarSampleSrc("Triplanar Sample Source", Float) = 0
+		[Enum(WorldPos, 0, WorldNormal, 1, ViewNormal, 2)]_TriplanarCoordinateSrc("Triplanar Coordinate Source", Float) = 0
+		_TriplanarScale("Triplanar Coordinate Scale", Float) = 1
+		_TriplanarOffsetX("Triplanar Offset X", Float) = 0
+		_TriplanarOffsetY("Triplanar Offset Y", Float) = 0
+		_TriplanarOffsetZ("Triplanar Offset Z", Float) = 0
+		_TriplanarSharpness("Triplanar Sharpness", Float) = 2
+		[Enum(Low, 0, High (Requires Directional Light),1)]_TriplanarQuality("Triplanar Quality", Float) = 1
+		[Enum(None, 0, Multiply, 1, MulAdd, 2)]_TriplanarBlendMode("Triplanar Blend Mode", Float) = 1
+		_TriplanarOpacity("Triplanar Opacity", Float) = 0
+
 		// Screen Distortion Effects
 		[Header(Screen Distortion Effects)]
 		_ShrinkWidth("Shrink Width", Float) = 0
@@ -225,7 +239,7 @@
 
 		_NormalVectorDisplacementStrength("Normal Vector Displacement Strength", Float) = 0
 		[Enum(View, 0, World, 1)] _NormalVectorDisplacementCoordinateSpace("Normal Vector Displacement Coordinate Space", Float) = 1
-		[Enum(Low, 0, High, 1)] _NormalVectorDisplacementQuality("Normal Vector Displacement Quality", Float) = 1
+		[Enum(Low, 0, High (Requires Directional Light), 1)] _NormalVectorDisplacementQuality("Normal Vector Displacement Quality", Float) = 1
 
 		// Screen color effects
 		[Header(Screen Color Effects)]
@@ -343,6 +357,7 @@
 			int _ParticleSystem;
 			float _Visibility;
 			
+			// Image Overlay params
 			sampler2D _MemeTex;
 			float4 _MemeTex_TexelSize;
 			float4 _MemeTex_ST;
@@ -365,6 +380,7 @@
 
 			float _CancerOpacity;
 
+			// Displacement Map params
 			sampler2D _DisplacementMap;
 			float4 _DisplacementMap_TexelSize;
 			float4 _DisplacementMap_ST;
@@ -377,6 +393,20 @@
 			float _DisplacementMapIntensity;
 			int _DisplacementMapClamp;
 			int _DisplacementMapCutOut;
+
+			// Triplanar params
+			sampler2D _TriplanarMap;
+			float4 _TriplanarMap_ST;
+			float _TriplanarSampleSrc;
+			float _TriplanarCoordinateSrc;
+			float _TriplanarScale;
+			float _TriplanarOffsetX;
+			float _TriplanarOffsetY;
+			float _TriplanarOffsetZ;
+			float _TriplanarSharpness;
+			float _TriplanarQuality;
+			float _TriplanarBlendMode;
+			float _TriplanarOpacity;
 
 			// Screen distortion params
 			float _ShrinkWidth;
@@ -1022,7 +1052,7 @@
 						samplePosition.xyz = mul(rotAxis(axisFront, _DisplacementMapAngle), samplePosition.xyz);
 
 					bool dropDistortion = false;
-					half4 displacementVector = stereoImageOverlay(samplePosition,
+					half4 displacementVector = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
 						_DisplacementMap, _DisplacementMap_ST, _DisplacementMap_TexelSize,
 						_DisplacementMapColumns, _DisplacementMapRows, _DisplacementMapCount, _DisplacementMapIndex,
 						1.0, _DisplacementMapClamp, _DisplacementMapCutOut,
@@ -1162,6 +1192,36 @@
 				}
 
 				UNITY_BRANCH
+				if (_TriplanarOpacity != 0)
+				{
+					half3 triplanarColor = half3(0, 0, 0);
+
+					float3 normal = normal = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
+						i.worldPos, startingAxisAlignedPos, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, 1, _TriplanarQuality);
+
+					// Sample map
+					if (_TriplanarSampleSrc == 0)
+						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, startingAxisAlignedPos,
+							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 1, false);
+					// Sample screen, UV range is reduced to the range (0.2, 0.8) to hide the VR mask.
+					else
+						triplanarColor = stereoTriplanarMappping(_stereoCancerTexture, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, startingAxisAlignedPos,
+							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 0.6, true);
+
+					triplanarColor *= _TriplanarOpacity;
+
+					// None, aka Override.
+					if (_TriplanarBlendMode == 0)
+						bgcolor.rgb = triplanarColor;
+					// Multiply
+					else if (_TriplanarBlendMode == 1)
+						bgcolor.rgb *= triplanarColor;
+					// MulAdd
+					else
+						bgcolor.rgb += bgcolor.rgb*triplanarColor;
+				}
+
+				UNITY_BRANCH
 				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
 					bgcolor.rgb += signalNoise(finishedWorldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
 
@@ -1180,7 +1240,7 @@
 						samplePosition.xyz = mul(rotAxis(axisFront, _MemeImageAngle), samplePosition.xyz);
 
 					bool dropMemePixels = false;
-					half4 memeColor = stereoImageOverlay(samplePosition,
+					half4 memeColor = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
 						_MemeTex, _MemeTex_ST, _MemeTex_TexelSize,
 						_MemeImageColumns, _MemeImageRows, _MemeImageCount, _MemeImageIndex,
 						_MemeTexOpacity, _MemeTexClamp, _MemeTexCutOut,
