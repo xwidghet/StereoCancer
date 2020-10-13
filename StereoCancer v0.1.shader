@@ -40,6 +40,9 @@
 		_CancerOpacity("Cancer Opacity", Float) = 1
 		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
 		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
+		[Enum(Screen,0, Projected (Requires Directional Light),1)] _CoordinateSpace("Coordinate Space", Float) = 0
+		_CoordinateScale("Coordinate Scale", Float) = 1
+		_WorldCoordinatesWrapValue("Wrap World Coordinates", Range(0, 1)) = 0
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
@@ -355,6 +358,9 @@
 			#include "StereoCancerFunctions.cginc"
 			
 			int _ParticleSystem;
+			float _CoordinateSpace;
+			float _CoordinateScale;
+			float _WorldCoordinatesWrapValue;
 			float _Visibility;
 			
 			// Image Overlay params
@@ -738,6 +744,27 @@
 				
 				// Vector from the 'camera' to the world-axis aligned worldPos.
 				float3 worldVector = normalize(i.worldPos);
+
+				// Projected coordinate space
+				if (_CoordinateSpace == 1)
+				{
+					// Convert from world-axis aligned coordinates to world space coordinates.
+					i.worldPos.xyz = mul(i.inverseViewMatRot, i.worldPos.xyz);
+					i.worldPos.xyz += i.camPos;
+
+					// Reconstruct view coordinates from depth
+					float4 uv = computeStereoUV(i.worldPos);
+					float depth = SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, uv);
+					
+					// Use the length of the reconstructed view ray to adjust our position
+					// and retain the custom world-axis aligned coordinate system.
+					depth = length(viewPosFromDepth(inverse(UNITY_MATRIX_P), uv.xy / uv.w, depth));
+					i.worldPos.xyz = worldVector.xyz * depth;
+				}
+
+				// Allow for easily changing effect intensities without having to modify
+				// an entire animation. Also very useful for adjusting projected coordinates.
+				i.worldPos.xyz *= _CoordinateScale;
 
 				// Store the starting position to allow for things like using the
 				// derivative (ddx, ddy) to calculate nearby positions to sample depth.
@@ -1156,6 +1183,21 @@
 					stereoPosition = computeStereoUV(i.worldPos);
 				}
 
+				// Wrap world coordinates after all effects have been applied
+				// This allows for hiding the VR Mask when wrapping around
+				//
+				// Todo: Grab the frustum corners to calculate the starting
+				//		 wrap value.
+				if (_WorldCoordinatesWrapValue != 0)
+				{
+					finishedWorldPos = wrapWorldCoordinates(finishedWorldPos, _WorldCoordinatesWrapValue);
+
+					i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
+					i.worldPos.xyz += i.camPos;
+
+					stereoPosition = computeStereoUV(i.worldPos);
+				}
+
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
 				// each eye.
@@ -1196,7 +1238,7 @@
 				{
 					half3 triplanarColor = half3(0, 0, 0);
 
-					float3 normal = normal = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
+					float3 normal = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
 						i.worldPos, startingAxisAlignedPos, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, 1, _TriplanarQuality);
 
 					// Sample map

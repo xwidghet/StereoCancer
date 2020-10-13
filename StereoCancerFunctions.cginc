@@ -52,6 +52,22 @@ bool mirrorCheck(float cancerDisplayMode)
 	return (cancerDisplayMode == 1 && !isMirror) || (cancerDisplayMode == 0 && isMirror);
 }
 
+// Expects stereo UV coordinates to have been divided by w
+float4 viewPosFromDepth(float4x4 invProj, float2 uv, float depth)
+{
+#ifdef UNITY_SINGLE_PASS_STEREO
+	// Ensure both eye UVs are in the range of 0-1 for reverse projection later
+	uv.x *= 2;
+	uv.x -= step(1, unity_StereoEyeIndex);
+#endif
+
+	// Convert UV to clip space and retrieve the view position
+	// https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
+	float4 viewPos = mul(invProj, float4(-uv.xy*2.0 + 1.0, depth, 1.0));
+
+	return viewPos / viewPos.w;
+}
+
   //////////////////////////////
  // Virtual Reality Effects ///
 //////////////////////////////
@@ -139,11 +155,26 @@ float4 wrapUVCoordinates(float4 stereoCoordinates)
 	return stereoCoordinates;
 }
 
+float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
+{
+	wrapValue = (1.0 - wrapValue)*100;
+	float2 signs = sign(worldCoordinates.xy);
+
+	// Shift all coordinates past the wrapping point to resolve
+	// a discontinuity in the range (wrapValue/2, wrapValue).
+	worldCoordinates.xy += signs.xy*wrapValue;
+
+	// Todo: Figure out a solution for handling Z coordinate wrapping
+	worldCoordinates.xy = frac(abs(worldCoordinates.xy) / wrapValue / 2)*signs.xy*wrapValue * 2 - signs.xy*wrapValue;
+
+	return worldCoordinates;
+}
+
 float4 shrink(float3 view, float3 axis, float4 worldPos, float intensity)
 {
 	float angle = acos(dot(view, axis));
-	float interpolation = abs(UNITY_PI / 2 - angle);
-	float dir = 1 + -2 * step(UNITY_PI / 2, angle);
+	float interpolation = abs(UNITY_HALF_PI - angle);
+	float dir = 1 + -2 * step(UNITY_HALF_PI, angle);
 
 	worldPos.xyz += dir * axis*intensity*interpolation;
 
@@ -152,7 +183,7 @@ float4 shrink(float3 view, float3 axis, float4 worldPos, float intensity)
 
 float4 stereoRotate(float4 worldCoordinates, float3 axis, float angle)
 {
-	worldCoordinates.xyz = mul(rotAxis(axis, fmod(angle, UNITY_PI * 2)), worldCoordinates);
+	worldCoordinates.xyz = mul(rotAxis(axis, fmod(angle, UNITY_TWO_PI)), worldCoordinates);
 
 	return worldCoordinates;
 }
@@ -415,14 +446,16 @@ float4 stereoRipple(float4 worldCoordinates, float3 axis, float density, float a
 
 float4 stereoZigZag(float4 worldCoordinates, float3 moveAxis, float flipPoint, float density, float amplitude, float offset)
 {
-	float effectVal = (flipPoint / density + offset);
-	effectVal = fmod(abs(effectVal), 2.0);
+	// Well hello there magic constant values. Please feel enjoy.
+	float effectVal = frac(flipPoint * density * 0.001 + offset * 0.01);
 
-	UNITY_BRANCH
-	if (effectVal > 1)
-		effectVal = 2.0 - effectVal;
+	float intPos = floor(abs(effectVal) * 10);
+	float skewDir = -1 + 2 * step(1, (intPos % 2));
 
-	worldCoordinates.xyz += moveAxis * tpdf(effectVal) * amplitude;
+	float skewVal = fmod(abs(effectVal), 0.1) / 0.1 - 0.5;
+	skewVal *= skewDir * amplitude;
+
+	worldCoordinates.xyz += moveAxis * skewVal;
 
 	return worldCoordinates;
 }
@@ -623,10 +656,10 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		//
 		// Solution: Texel-aligned world positons combined with world position derivatives.
 		float4 centerPos = worldCoordinates;
-		
+
 		centerPos = mul(UNITY_MATRIX_VP, centerPos);
 		centerPos = ComputeGrabScreenPos(centerPos);
-	
+
 		centerPos.xy = AlignWithGrabTexel(texelSize, centerPos.xy / centerPos.w);
 		centerPos.xy *= centerPos.w;
 
@@ -666,7 +699,7 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		float3 p0 = cameraPosition + toWorldPosDir * centerDepth;
 		float3 p1 = cameraPosition + toPos1 * leftDepth;
 		float3 p2 = cameraPosition + toPos2 * upDepth;
-		
+
 		if (abs(rightDepth - centerDepth) < abs(leftDepth - centerDepth))
 		{
 			toPos1 = normalize(rightPos.xyz - cameraPosition);
@@ -713,12 +746,12 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 
 		float3 toWorldPosDir = normalize(worldCoordinates.xyz - cameraPosition);
 		float3 depthWorldPos = cameraPosition + toWorldPosDir * depth;
-
+		
 		// View Space
 		UNITY_BRANCH
 		if (coordinateSpace == 0)
 			depthWorldPos = mul(UNITY_MATRIX_V, depthWorldPos);
-		
+
 		normal = normalize(cross(ddx(depthWorldPos), ddy(depthWorldPos)));
 	}
 	
@@ -889,20 +922,18 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sampler2D depthMap, float4 depthSamplePos, float3 camPos, float3 normal, float4 worldCoordinates, float4 startingAxisAlignedPos,
 	float offsetX, float offsetY, float offsetZ, float coordinateSource, float scale, float sharpness, float uvRange, bool sampleScreen)
 {
+	float3 samplePosition = float3(0, 0, 0);
+
 	float sampleDepth = SAMPLE_DEPTH_TEXTURE_PROJ(depthMap, UNITY_PROJ_COORD(depthSamplePos));
 	sampleDepth = DECODE_EYEDEPTH(sampleDepth);
 
-	float3 samplePosition = float3(0, 0, 0);
-
-	// World Position
-	if (coordinateSource == 0)
-	{
-		float3 viewDirection = normalize(worldCoordinates.xyz - camPos);
-		samplePosition = camPos + viewDirection * sampleDepth;
-	}
+	float3 viewDirection = normalize(worldCoordinates.xyz - camPos);
+	samplePosition = camPos + viewDirection * sampleDepth;
+	
 	// World Normal or View Normal
-	else
-		samplePosition = normal;
+	// Todo: Resolve distortion via perspective correction without breaking stereo correctness
+	if (coordinateSource != 0)
+		samplePosition = mul(rotAxis(normal, UNITY_HALF_PI), samplePosition.xyz);
 
 	samplePosition.xyz += float3(offsetX, offsetY, offsetZ);
 	samplePosition /= scale;
@@ -1045,7 +1076,7 @@ half3 imaginaryColors(float3 worldVector, float angle)
 {
 #ifdef UNITY_SINGLE_PASS_STEREO
 	// Flip the color wheel for the other eye to generate 'imaginary' colors
-	angle += (UNITY_PI/2) * step(1, unity_StereoEyeIndex);
+	angle += (UNITY_HALF_PI) * step(1, unity_StereoEyeIndex);
 #endif
 
 	worldVector = mul(rotAxis(float3(0, 0, 1), angle), worldVector);
