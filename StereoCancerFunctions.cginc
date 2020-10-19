@@ -1,3 +1,5 @@
+// UNITY_SHADER_NO_UPGRADE
+
 // A collection of effects made by xwidghet to allow for creating dynamic stereo-correct shader animations
 // which can be combined together without creating massive performance issues.
 //
@@ -52,7 +54,7 @@ bool mirrorCheck(float cancerDisplayMode)
 	return (cancerDisplayMode == 1 && !isMirror) || (cancerDisplayMode == 0 && isMirror);
 }
 
-// Expects stereo UV coordinates to have been divided by w
+// Expects stereo UV coordinates and depth to have been divided by w
 float4 viewPosFromDepth(float4x4 invProj, float2 uv, float depth)
 {
 #ifdef UNITY_SINGLE_PASS_STEREO
@@ -63,9 +65,20 @@ float4 viewPosFromDepth(float4x4 invProj, float2 uv, float depth)
 
 	// Convert UV to clip space and retrieve the view position
 	// https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
-	float4 viewPos = mul(invProj, float4(-uv.xy*2.0 + 1.0, depth, 1.0));
+	float4 viewPos = mul(invProj, float4(uv.xy*2.0 - 1.0, depth, 1.0));
 
 	return viewPos / viewPos.w;
+}
+
+float3 worldPosFromDepth(sampler2D depthTexture, float4 depthSamplePos, float3 camPos, float4 worldCoordinates)
+{
+	float sampleDepth = SAMPLE_DEPTH_TEXTURE_PROJ(depthTexture, depthSamplePos);
+	sampleDepth = DECODE_EYEDEPTH(sampleDepth);
+
+	// https://gamedev.stackexchange.com/questions/131978/shader-reconstructing-position-from-depth-in-vr-through-projection-matrix
+	float3 viewDirection = (worldCoordinates.xyz - camPos) / (-mul(UNITY_MATRIX_V, worldCoordinates).z);
+
+	return camPos + viewDirection * sampleDepth;
 }
 
   //////////////////////////////
@@ -168,17 +181,6 @@ float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
 	worldCoordinates.xy = frac(abs(worldCoordinates.xy) / wrapValue / 2)*signs.xy*wrapValue * 2 - signs.xy*wrapValue;
 
 	return worldCoordinates;
-}
-
-float4 shrink(float3 view, float3 axis, float4 worldPos, float intensity)
-{
-	float angle = acos(dot(view, axis));
-	float interpolation = abs(UNITY_HALF_PI - angle);
-	float dir = 1 + -2 * step(UNITY_HALF_PI, angle);
-
-	worldPos.xyz += dir * axis*intensity*interpolation;
-
-	return worldPos;
 }
 
 float4 stereoRotate(float4 worldCoordinates, float3 axis, float angle)
@@ -376,6 +378,13 @@ float4 stereoSpiral(float4 worldCoordinates, float3 camFront, float intensity)
 	float angleToWorldVector = acos(dot(worldVector, camFront));
 
 	worldCoordinates.xyz = mul(rotAxis(camFront, dist*angleToWorldVector*intensity), worldCoordinates.xyz);
+
+	return worldCoordinates;
+}
+
+float4 stereoPolarInversion(float4 worldCoordinates, float intensity)
+{
+	worldCoordinates.xy -= normalize(worldCoordinates.xy)*intensity;
 
 	return worldCoordinates;
 }
@@ -641,8 +650,8 @@ float3 colorVectorDisplacement(sampler2D textureHandle, float4 stereoPosition, f
 // https://wickedengine.net/2019/09/22/improved-normal-reconstruction-from-depth/
 //
 // This is a workaround for not having _CameraDepthNormalsTexture in forward rendering.
-float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float4 stereoPosition, float4 worldCoordinates, float4 startingWorldPos, float3 cameraPosition, float3 axisRight, float3 axisUp,
-	float coordinateSpace, float displacementStrength, float quality)
+float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float4 stereoPosition, float4 worldCoordinates, float3 cameraPosition, float3 axisRight, float3 axisUp,
+	float coordinateSpace, float quality)
 {
 	float3 normal = float3(0, 0, 0);
 
@@ -657,37 +666,62 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		// Solution: Texel-aligned world positons combined with world position derivatives.
 		float4 centerPos = worldCoordinates;
 
+		// Generate texel aligned samples without using ddx/ddy to avoid artifacts
 		centerPos = mul(UNITY_MATRIX_VP, centerPos);
 		centerPos = ComputeGrabScreenPos(centerPos);
 
 		centerPos.xy = AlignWithGrabTexel(texelSize, centerPos.xy / centerPos.w);
+
+		float4 leftPos = centerPos;
+		float4 rightPos = centerPos;
+		float4 upPos = centerPos;
+		float4 downPos = centerPos;
+
+		leftPos.xy = centerPos.xy + float2(-1,0)*texelSize.xy;
+		rightPos.xy = centerPos.xy + float2(1, 0)*texelSize.xy;
+		upPos.xy = centerPos.xy + float2(0, 1)*texelSize.xy;
+		downPos.xy = centerPos.xy + float2(0, -1)*texelSize.xy;
+
 		centerPos.xy *= centerPos.w;
+		leftPos.xy *= centerPos.w;
+		rightPos.xy *= centerPos.w;
+		upPos.xy *= centerPos.w;
+		downPos.xy *= centerPos.w;
 
 		centerPos = reverseComputeGrabScreenPos(centerPos);
-		centerPos = mul(inverse(UNITY_MATRIX_VP), centerPos);
+		leftPos = reverseComputeGrabScreenPos(leftPos);
+		rightPos = reverseComputeGrabScreenPos(rightPos);
+		upPos = reverseComputeGrabScreenPos(upPos);
+		downPos = reverseComputeGrabScreenPos(downPos);
 
-		// Utilize the world position derivative to calculate nearby positions to sample depth
-		float2 worldPosDerivative = float2(-ddx(startingWorldPos.x), ddy(startingWorldPos.y));
+		float4x4 invVP = inverse(UNITY_MATRIX_VP);
 
-		float4 leftPos = float4(centerPos.xyz - axisRight * worldPosDerivative.x, centerPos.w);
-		float4 rightPos = float4(centerPos.xyz + axisRight * worldPosDerivative.x, centerPos.w);
+		centerPos = mul(invVP, centerPos);
+		leftPos = mul(invVP, leftPos);
+		rightPos = mul(invVP, rightPos);
+		upPos = mul(invVP, upPos);
+		downPos = mul(invVP, downPos);
 
-		float4 upPos = float4(centerPos.xyz + axisUp * worldPosDerivative.y, centerPos.w);
-		float4 downPos = float4(centerPos.xyz - axisUp * worldPosDerivative.y, centerPos.w);
+		float4 centerUV = computeStereoUV(centerPos);
+		float4 leftUV = computeStereoUV(leftPos);
+		float4 rightUV = computeStereoUV(rightPos);
+		float4 upUV = computeStereoUV(upPos);
+		float4 downUV = computeStereoUV(downPos);
 
-		float centerDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(centerPos));
+		// Calculate a perspective-correct depth for all 5 samples
+		float centerDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, centerUV);
+		float leftDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, leftUV);
+		float rightDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, rightUV);
+		float upDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, upUV);
+		float downDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, downUV);
+		
+		float4x4 invProj = inverse(UNITY_MATRIX_P);
 
-		float leftDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(leftPos));
-		float rightDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(rightPos));
-
-		float upDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(upPos));
-		float downDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, computeStereoUV(downPos));
-
-		centerDepth = DECODE_EYEDEPTH(centerDepth);
-		leftDepth = DECODE_EYEDEPTH(leftDepth);
-		rightDepth = DECODE_EYEDEPTH(rightDepth);
-		upDepth = DECODE_EYEDEPTH(upDepth);
-		downDepth = DECODE_EYEDEPTH(downDepth);
+		centerDepth = length(viewPosFromDepth(invProj, centerUV.xy / centerUV.w, centerDepth / centerUV.w));
+		leftDepth = length(viewPosFromDepth(invProj, leftUV.xy / leftUV.w, leftDepth / centerUV.w));
+		rightDepth = length(viewPosFromDepth(invProj, rightUV.xy / rightUV.w, rightDepth / centerUV.w));
+		upDepth = length(viewPosFromDepth(invProj, upUV.xy / upUV.w, upDepth / centerUV.w));
+		downDepth = length(viewPosFromDepth(invProj, downUV.xy / downUV.w, downDepth / centerUV.w));
 
 		// Solve for the triangle which is the best fit
 		bool reverseOrder = false;
@@ -742,7 +776,7 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 	else
 	{
 		float depth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, stereoPosition);
-		depth = DECODE_EYEDEPTH(depth);
+		depth = length(viewPosFromDepth(inverse(UNITY_MATRIX_P), stereoPosition.xy / stereoPosition.w, depth / stereoPosition.w));
 
 		float3 toWorldPosDir = normalize(worldCoordinates.xyz - cameraPosition);
 		float3 depthWorldPos = cameraPosition + toWorldPosDir * depth;
@@ -754,8 +788,6 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 
 		normal = normalize(cross(ddx(depthWorldPos), ddy(depthWorldPos)));
 	}
-	
-	normal *= displacementStrength;
 
 	return normal;
 }
@@ -919,21 +951,14 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 		tex2Dproj(abberationTexture, blueAbberationPos).b, 0);
 }
 
-half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sampler2D depthMap, float4 depthSamplePos, float3 camPos, float3 normal, float4 worldCoordinates, float4 startingAxisAlignedPos,
+half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sampler2D depthMap, float4 depthSamplePos, float3 camPos, float3 normal, float4 worldCoordinates, float4 axisAlignedPos,
 	float offsetX, float offsetY, float offsetZ, float coordinateSource, float scale, float sharpness, float uvRange, bool sampleScreen)
 {
-	float3 samplePosition = float3(0, 0, 0);
-
-	float sampleDepth = SAMPLE_DEPTH_TEXTURE_PROJ(depthMap, UNITY_PROJ_COORD(depthSamplePos));
-	sampleDepth = DECODE_EYEDEPTH(sampleDepth);
-
-	float3 viewDirection = normalize(worldCoordinates.xyz - camPos);
-	samplePosition = camPos + viewDirection * sampleDepth;
+	float3 samplePosition = worldPosFromDepth(depthMap, depthSamplePos, camPos, worldCoordinates);
 	
 	// World Normal or View Normal
-	// Todo: Resolve distortion via perspective correction without breaking stereo correctness
 	if (coordinateSource != 0)
-		samplePosition = mul(rotAxis(normal, UNITY_HALF_PI), samplePosition.xyz);
+		samplePosition.xyz = mul(rotAxis(normal, UNITY_HALF_PI), samplePosition.xyz);
 
 	samplePosition.xyz += float3(offsetX, offsetY, offsetZ);
 	samplePosition /= scale;
@@ -1086,6 +1111,78 @@ half3 imaginaryColors(float3 worldVector, float angle)
 	worldVector *= 1.0/rcp(worldVector);
 
 	return worldVector.xyz;
+}
+
+float3 sampleSobel(sampler2D textureHandle, float3 camRight, float3 camUp, float4 worldCoordinates, float searchDistance)
+{
+	static const float3x3 sobelXWeight = {
+		1, 0, -1,
+		2, 0, -2,
+		1, 0, -1
+	};
+	static const float3x3 sobelYWeight = {
+		1, 2, 1,
+		0, 0, 0,
+		-1, -2, -1
+	};
+
+	float3 Gx = float3(0, 0, 0);
+	float3 Gy = float3(0, 0, 0);
+
+	for (int x = 0; x < 3; x++)
+		for (int y = 0; y < 3; y++)
+		{
+			// Skip center sample since the weight is 0 for both kernels
+			UNITY_BRANCH
+			if (!(x == 1 && y == 1))
+			{
+				float2 sampleOffset = float2(x - 1, y - 1) * searchDistance;
+				float4 samplePos = worldCoordinates;
+				samplePos.xyz += sampleOffset.x * camRight + sampleOffset.y * camUp;
+
+				float3 cancerColor = tex2Dproj(textureHandle, computeStereoUV(samplePos));
+
+				Gx += sobelXWeight[x, y] * cancerColor;
+				Gy += sobelYWeight[x, y] * cancerColor;
+			}
+		}
+
+	return -normalize(sqrt(Gx*Gx + Gy * Gy));
+}
+
+float sobelFilter(sampler2D textureHandle, float3 camRight, float3 camUp, float4 worldCoordinates, float searchDistance, float quality)
+{
+	float3 sobelMag = sampleSobel(textureHandle, camRight, camUp, worldCoordinates, searchDistance);
+
+	// High quality, sample the surrounding pixels to smooth out the outlines
+	if (quality != 0)
+	{
+		float4x3 sobelMagMat;
+		float subSampleOffset = searchDistance / 2;
+
+		for (int i = 0; i < 4; i++)
+		{
+			float4 centerSamplePos = worldCoordinates;
+
+			switch (i)
+			{
+			case 0: centerSamplePos.xyz += (-camRight - camUp)*subSampleOffset;
+				break;
+			case 1: centerSamplePos.xyz += (camRight - camUp)*subSampleOffset;
+				break;
+			case 2: centerSamplePos.xyz += (camRight + camUp)*subSampleOffset;
+				break;
+			case 3: centerSamplePos.xyz += (-camRight + camUp)*subSampleOffset;
+				break;
+			}
+
+			sobelMagMat[i] = sampleSobel(textureHandle, camRight, camUp, centerSamplePos, subSampleOffset);
+		}
+
+		sobelMag = (sobelMag + (sobelMagMat[0] + sobelMagMat[1] + sobelMagMat[2] + sobelMagMat[3]) / 4) / 2;
+	}
+
+	return -max(sobelMag.r, max(sobelMag.g, sobelMag.b));
 }
 
 #endif

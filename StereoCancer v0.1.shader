@@ -37,7 +37,6 @@
 	Properties
 	{
 		[Header(Rendering Parameters)]
-		_CancerOpacity("Cancer Opacity", Float) = 1
 		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
 		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 		[Enum(Screen,0, Projected (Requires Directional Light),1)] _CoordinateSpace("Coordinate Space", Float) = 0
@@ -46,6 +45,11 @@
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
+
+		[Header(Blending)]
+		[Enum(UnityEngine.Rendering.BlendMode)] _SrcFactor("SrcFactor", Float) = 5
+		[Enum(UnityEngine.Rendering.BlendMode)] _DstFactor("DstFactor", Float) = 10
+		_CancerOpacity("Cancer Opacity", Float) = 1
 
 		// VR Effects
 		[Header(Virtual Reality Effects)]
@@ -196,15 +200,17 @@
 		_RingRotationRadius("Ring Rotation Radius", Float) = 0
 		_RingRotationWidth("Ring Rotation Width", Float) = 0
 
-		_WarpIntensity("Warp Intensity", Float) = 0
 		_WarpAngle("Warp Angle", Float) = 0
+		_WarpIntensity("Warp Intensity", Float) = 0
 
 		_SpiralIntensity("Spiral Intensity", Float) = 0
 
+		_PolarInversionIntensity("Polar Inversion Intensity", Float) = 0
+
 		_FishEyeIntensity("Fish Eye Intensity", Float) = 0
 
-		_KaleidoscopeSegments("Kaleidoscope Segments", Range(0,32)) = 0
 		_KaleidoscopeAngle("Kaleidoscope Angle", Float) = 0
+		_KaleidoscopeSegments("Kaleidoscope Segments", Range(0,32)) = 0
 
 		_BlockDisplacementAngle("Block Displacement Angle", Float) = 0
 		_BlockDisplacementSize("Block Displacement Size", Float) = 0
@@ -281,6 +287,11 @@
 		_ImaginaryColorOpacity("Imaginary Color Opacity", Float) = 0
 		_ImaginaryColorAngle("Imaginary Color Angle", Float) = 0
 
+		_SobelSearchDistance("Sobel Search Distance", Float) = 0.2
+		[Enum(Low, 0, High, 1)] _SobelQuality("Sobel Quality", Float) = 1
+		_SobelOpacity("Sobel Opacity", Float) = 0
+		[Enum(None, 0, Multiply, 1, MulAdd, 2)] _SobelBlendMode("Sobel Blend Mode", Float) = 0
+
 		_colorSkewRDistance("Red Move Distance", Float) = 0
 		_colorSkewRAngle("Red Move Angle", Float) = 0
 		_colorSkewROpacity("Red Move Opacity", Float) = 0
@@ -309,7 +320,7 @@
 
 		// Blend against the current screen texture to allow for
 		// fading in/out the cancer effects and various other shenanigans.
-		Blend SrcAlpha OneMinusSrcAlpha
+		Blend[_SrcFactor][_DstFactor]
 		
 		// Grab Pass textures are shared by name, so this must be a unique name.
 		// Otherwise we'll get the screen texture from the time the first object rendered
@@ -500,6 +511,8 @@
 
 			float _SpiralIntensity;
 
+			float _PolarInversionIntensity;
+
 			float _FishEyeIntensity;
 
 			float _SinWaveAngle;
@@ -602,6 +615,11 @@
 			float _CircularVignetteMode;
 			float _CircularVignetteBegin;
 			float _CircularVignetteEnd;
+
+			float _SobelSearchDistance;
+			float _SobelQuality;
+			float _SobelOpacity;
+			float _SobelBlendMode;
 
 			float _colorSkewRDistance;
 			float _colorSkewRAngle;
@@ -758,7 +776,7 @@
 					
 					// Use the length of the reconstructed view ray to adjust our position
 					// and retain the custom world-axis aligned coordinate system.
-					depth = length(viewPosFromDepth(inverse(UNITY_MATRIX_P), uv.xy / uv.w, depth));
+					depth = length(viewPosFromDepth(inverse(UNITY_MATRIX_P), uv.xy / uv.w, depth / uv.w));
 					i.worldPos.xyz = worldVector.xyz * depth;
 				}
 
@@ -805,10 +823,10 @@
 				//////////////////////////////////////////
 				UNITY_BRANCH
 				if (_ShrinkHeight != 0)
-					i.worldPos = shrink(worldVector, axisUp, i.worldPos, _ShrinkHeight);
+					i.worldPos.y += i.worldPos.y*(_ShrinkHeight * 0.02);
 				UNITY_BRANCH
 				if (_ShrinkWidth != 0)
-					i.worldPos = shrink(worldVector, axisRight, i.worldPos, _ShrinkWidth);
+					i.worldPos.x += i.worldPos.x*(_ShrinkWidth * 0.02);
 
 				UNITY_BRANCH
 				if(_RotationX != 0)
@@ -1021,6 +1039,10 @@
 					i.worldPos = stereoSpiral(i.worldPos, axisFront, _SpiralIntensity / 1000);
 
 				UNITY_BRANCH
+				if (_PolarInversionIntensity != 0)
+					i.worldPos = stereoPolarInversion(i.worldPos, _PolarInversionIntensity);
+
+				UNITY_BRANCH
 				if(_FishEyeIntensity != 0)
 					i.worldPos = stereoFishEye(i.worldPos, axisFront, _FishEyeIntensity);
 
@@ -1154,7 +1176,9 @@
 				if (_NormalVectorDisplacementStrength != 0)
 				{
 					float3 normalDisplacement = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
-						i.worldPos, startingAxisAlignedPos, i.camPos, i.camRight, i.camUp, _NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementStrength, _NormalVectorDisplacementQuality);
+						i.worldPos, i.camPos, i.camRight, i.camUp, _NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementQuality);
+
+					normalDisplacement *= _NormalVectorDisplacementStrength;
 
 					// Debug normals
 					//return float4(normalDisplacement, 1);
@@ -1239,15 +1263,15 @@
 					half3 triplanarColor = half3(0, 0, 0);
 
 					float3 normal = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
-						i.worldPos, startingAxisAlignedPos, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, 1, _TriplanarQuality);
+						i.worldPos, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, _TriplanarQuality);
 
 					// Sample map
 					if (_TriplanarSampleSrc == 0)
-						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, startingAxisAlignedPos,
+						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, finishedWorldPos,
 							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 1, false);
 					// Sample screen, UV range is reduced to the range (0.2, 0.8) to hide the VR mask.
 					else
-						triplanarColor = stereoTriplanarMappping(_stereoCancerTexture, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, startingAxisAlignedPos,
+						triplanarColor = stereoTriplanarMappping(_stereoCancerTexture, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, finishedWorldPos,
 							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 0.6, true);
 
 					triplanarColor *= _TriplanarOpacity;
@@ -1340,6 +1364,22 @@
 						bgcolor.rgb += imaginaryColor;
 					else if (_ImaginaryColorBlendMode == 2)
 						bgcolor.rgb += bgcolor.rgb*imaginaryColor;
+				}
+
+				UNITY_BRANCH
+				if (_SobelOpacity != 0)
+				{
+					float sobelMagnitude = sobelFilter(_stereoCancerTexture, i.camRight, i.camUp, i.worldPos, _SobelSearchDistance, _SobelQuality)*_SobelOpacity;
+
+					// None, aka Overwrite
+					if (_SobelBlendMode == 0)
+						bgcolor = float4(sobelMagnitude, sobelMagnitude, sobelMagnitude, 1);
+					// Multiply
+					else if (_SobelBlendMode == 1)
+						bgcolor.rgb *= sobelMagnitude;
+					// MulAdd
+					else if (_SobelBlendMode == 2)
+						bgcolor.rgb += bgcolor.rgb*sobelMagnitude;
 				}
 
 				// Check opacity and override since the user may be intentionally
