@@ -41,7 +41,8 @@
 		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 		[Enum(Screen,0, Projected (Requires Directional Light),1)] _CoordinateSpace("Coordinate Space", Float) = 0
 		_CoordinateScale("Coordinate Scale", Float) = 1
-		_WorldCoordinatesWrapValue("Wrap World Coordinates", Range(0, 1)) = 0
+		[Enum(Wrap,0, Cutout,1, Clamp,2)] _WorldSamplingMode("World Sampling Mode", Float) = 0
+		_WorldSamplingRange("World Sampling Range", Range(0, 1)) = 1
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
@@ -196,7 +197,8 @@
 		_CheckerboardShift("Checkerboard Shift Distance", Float) = 0
 		_Quantization("Quantization", Range(0,1)) = 0
 
-		_RingRotationAngle("Ring Rotation Angle", Float) = 3.1415926
+		_RingRotationInnerAngle("Ring Rotation Inner-Angle", Float) = 0
+		_RingRotationOuterAngle("Ring Rotation Outer-Angle", Float) = 3.1415926
 		_RingRotationRadius("Ring Rotation Radius", Float) = 0
 		_RingRotationWidth("Ring Rotation Width", Float) = 0
 
@@ -371,7 +373,8 @@
 			int _ParticleSystem;
 			float _CoordinateSpace;
 			float _CoordinateScale;
-			float _WorldCoordinatesWrapValue;
+			float _WorldSamplingMode;
+			float _WorldSamplingRange;
 			float _Visibility;
 			
 			// Image Overlay params
@@ -505,7 +508,8 @@
 			float _CheckerboardShift;
 			float _Quantization;
 
-			float _RingRotationAngle;
+			float _RingRotationInnerAngle;
+			float _RingRotationOuterAngle;
 			float _RingRotationRadius;
 			float _RingRotationWidth;
 
@@ -1028,7 +1032,7 @@
 
 				UNITY_BRANCH
 				if (_RingRotationWidth != 0)
-					i.worldPos = stereoRingRotation(i.worldPos, axisFront, _RingRotationAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
+					i.worldPos = stereoRingRotation(i.worldPos, axisFront, _RingRotationInnerAngle, _RingRotationOuterAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
 
 				UNITY_BRANCH
 				if (_WarpIntensity != 0)
@@ -1212,16 +1216,47 @@
 				//
 				// Todo: Grab the frustum corners to calculate the starting
 				//		 wrap value.
-				if (_WorldCoordinatesWrapValue != 0)
+
+				// Wrap
+				if (_WorldSamplingRange != 1)
 				{
-					finishedWorldPos = wrapWorldCoordinates(finishedWorldPos, _WorldCoordinatesWrapValue);
+					if (_WorldSamplingMode == 0)
+					{
+						finishedWorldPos = wrapWorldCoordinates(finishedWorldPos, _WorldSamplingRange);
 
-					i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
-					i.worldPos.xyz += i.camPos;
+						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
+						i.worldPos.xyz += i.camPos;
 
-					stereoPosition = computeStereoUV(i.worldPos);
+						stereoPosition = computeStereoUV(i.worldPos);
+					}
+					// Cutout
+					else if (_WorldSamplingMode == 1)
+					{
+						float sampleLimit = _WorldSamplingRange * 100;
+						sampleLimit -= (abs(finishedWorldPos.z - 100) / 100)*sampleLimit;
+						sampleLimit = abs(sampleLimit);
+
+						if (finishedWorldPos.x < -sampleLimit || finishedWorldPos.x > sampleLimit ||
+							finishedWorldPos.y < -sampleLimit || finishedWorldPos.y > sampleLimit)
+							discard;
+					}
+					// Clamp
+					else if (_WorldSamplingMode == 2)
+					{
+						float sampleLimit = _WorldSamplingRange * 100;
+						sampleLimit -= (abs(finishedWorldPos.z - 100) / 100)*sampleLimit;
+						sampleLimit = abs(sampleLimit);
+
+						finishedWorldPos.xy = clamp(finishedWorldPos.xy, -sampleLimit, sampleLimit);
+
+						// Update world pos to match our new modified world axis position.
+						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
+						i.worldPos.xyz += i.camPos;
+
+						stereoPosition = computeStereoUV(i.worldPos);
+					}
 				}
-
+				
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
 				// each eye.
@@ -1232,8 +1267,8 @@
 				// Wrapping allows for creating 'infinite' texture
 				// and tunnel effects.
 				UNITY_BRANCH
-				if (_ScreenSamplingMode == 2)
-					stereoPosition = wrapUVCoordinates(stereoPosition);
+					if (_ScreenSamplingMode == 2)
+						stereoPosition = wrapUVCoordinates(stereoPosition);
 
 				  /////////////////////////
 				 // Apply Color Effects //
@@ -1335,6 +1370,9 @@
 								bgcolor += memeColor * _MemeTexOpacity;
 							}
 						}
+						// Overriding background but pixel has been cutout.
+						else if (_MemeTexOverrideMode == 1)
+							discard;
 					}
 					else
 					{

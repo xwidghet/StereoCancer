@@ -170,14 +170,20 @@ float4 wrapUVCoordinates(float4 stereoCoordinates)
 
 float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
 {
-	wrapValue = (1.0 - wrapValue)*100;
+	wrapValue = wrapValue*200;
 	float2 signs = sign(worldCoordinates.xy);
+
+	// Adjust wrap value based on the Z coordinate to constrain
+	// the pixels within the wrapValue bounds when Z-Axis movement
+	// occurs. Ex. Move Z, Ripple, and Simplex/Voroni noise effects.
+	wrapValue -= (abs(worldCoordinates.z - 100) / 100)*wrapValue;
+	wrapValue = abs(wrapValue);
 
 	// Shift all coordinates past the wrapping point to resolve
 	// a discontinuity in the range (wrapValue/2, wrapValue).
 	worldCoordinates.xy += signs.xy*wrapValue;
 
-	// Todo: Figure out a solution for handling Z coordinate wrapping
+	// Finally wrap coordinates around.
 	worldCoordinates.xy = frac(abs(worldCoordinates.xy) / wrapValue / 2)*signs.xy*wrapValue * 2 - signs.xy*wrapValue;
 
 	return worldCoordinates;
@@ -354,7 +360,7 @@ float4 stereoQuantization(float4 worldCoordinates, float scale)
 	return worldCoordinates;
 }
 
-float4 stereoRingRotation(float4 worldCoordinates,float3 camFront, float angle, float ringRadius, float ringWidth)
+float4 stereoRingRotation(float4 worldCoordinates,float3 camFront, float innerAngle, float outerAngle, float ringRadius, float ringWidth)
 {
 	// Not sure of what the best way is to make this intuitive to new users to use.
 	// If the user only changes ringWidth and not radius then their screen will be
@@ -364,7 +370,9 @@ float4 stereoRingRotation(float4 worldCoordinates,float3 camFront, float angle, 
 
 	UNITY_BRANCH
 	if (fmod(abs(AngleToFront), ringRadius - ringWidth) > ringRadius)
-		worldCoordinates = stereoRotate(worldCoordinates, camFront, angle);
+		worldCoordinates = stereoRotate(worldCoordinates, camFront, outerAngle);
+	else
+		worldCoordinates = stereoRotate(worldCoordinates, camFront, innerAngle);
 
 	return worldCoordinates;
 }
@@ -1142,12 +1150,12 @@ float3 sampleSobel(sampler2D textureHandle, float3 camRight, float3 camUp, float
 
 				float3 cancerColor = tex2Dproj(textureHandle, computeStereoUV(samplePos));
 
-				Gx += sobelXWeight[x, y] * cancerColor;
-				Gy += sobelYWeight[x, y] * cancerColor;
+				Gx += sobelXWeight[x][y] * cancerColor;
+				Gy += sobelYWeight[x][y] * cancerColor;
 			}
 		}
 
-	return -normalize(sqrt(Gx*Gx + Gy * Gy));
+	return -sqrt(Gx*Gx + Gy*Gy);
 }
 
 float sobelFilter(sampler2D textureHandle, float3 camRight, float3 camUp, float4 worldCoordinates, float searchDistance, float quality)
