@@ -189,6 +189,24 @@ float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
 	return worldCoordinates;
 }
 
+float4 projectCoordinates(sampler2D depthTexture, float3x3 inverseViewMatRot, float4 worldCoordinates, float3 camPos, float3 viewVector)
+{
+	// Convert from world-axis aligned coordinates to world space coordinates.
+	worldCoordinates.xyz = mul(inverseViewMatRot, worldCoordinates.xyz);
+	worldCoordinates.xyz += camPos;
+
+	// Reconstruct view coordinates from depth
+	float4 uv = computeStereoUV(worldCoordinates);
+	float depth = SAMPLE_DEPTH_TEXTURE_PROJ(depthTexture, uv);
+
+	// Use the length of the reconstructed view ray to adjust our position
+	// and retain the custom world-axis aligned coordinate system.
+	depth = length(viewPosFromDepth(inverse(UNITY_MATRIX_P), uv.xy / uv.w, depth / uv.w));
+	worldCoordinates.xyz = viewVector.xyz * depth;
+
+	return worldCoordinates;
+}
+
 float4 stereoRotate(float4 worldCoordinates, float3 axis, float angle)
 {
 	worldCoordinates.xyz = mul(rotAxis(axis, fmod(angle, UNITY_TWO_PI)), worldCoordinates);
@@ -828,7 +846,7 @@ float2 calculateUVFromAxisCoordinates(float4 axisCoordinates, float4 texture_ST,
 float4 stereoImageOverlay(float4 axisCoordinates, float4 startingAxisAlignedPos,
 	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize, 
 	int memeColumns, int memeRows, int memeCount, int memeIndex,
-	float opacity, float clampUV, float cutoutUV, inout bool dropMemePixels)
+	float clampUV, float cutoutUV, inout bool dropMemePixels)
 {
 	float2 uv = calculateUVFromAxisCoordinates(axisCoordinates, memeImage_ST, memeImage_TexelSize);
 	float2 startingUV = calculateUVFromAxisCoordinates(startingAxisAlignedPos, memeImage_ST, memeImage_TexelSize);
@@ -864,7 +882,31 @@ float4 stereoImageOverlay(float4 axisCoordinates, float4 startingAxisAlignedPos,
 	}
 
 	// Utilize ddx and ddy from the starting axis aligned coordiantes to resolve sampling artifacts when the texture wraps around.
-	return tex2D(memeImage, uv.xy, ddx(startingUV.x)*ddScaler.x, ddy(startingUV.y)*ddScaler.y) * opacity;
+	return tex2D(memeImage, uv.xy, ddx(startingUV.x)*ddScaler.x, ddy(startingUV.y)*ddScaler.y);
+}
+
+half3 fog(float3 bgcolor, float3 worldPosition, float fogMode, float4 fogColor, float fogBegin, float fogEnd)
+{
+	float fogDistance = length(worldPosition.xyz);
+
+	fogDistance = clamp(fogDistance - fogBegin, 0, 3.402823466e+38);
+	float fogRange = (fogEnd - fogBegin);
+	float fogAlpha = fogDistance / fogRange;
+
+	// Linear
+	if (fogMode == 1)
+		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(fogAlpha, 0, 1));
+	// Squared
+	else if (fogMode == 2)
+		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(fogAlpha*(fogAlpha+1), 0, 1));
+	// Log2
+	else if (fogMode == 3)
+		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(log2(1 + fogAlpha), 0, 1));
+	// Exponential
+	else
+		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(1.0 - exp(-fogAlpha), 0, 1));
+
+	return bgcolor;
 }
 
 // I wonder if this naming scheme will trigger any shader 'edgelords'
@@ -1090,6 +1132,37 @@ half3 circularVignette(half4 bgcolor, float4 worldPos, float4 color, float opaci
 	bgcolor.rgb += color * (opacity * (1 - vignetteFallOffAlpha));
 
 	return bgcolor.rgb;
+}
+
+half3 colorModifier(half3 bgcolor, float mode, float strength, float blend)
+{
+	float3 modifiedColor = float3(0, 0, 0);
+
+	// RCP
+	if (mode == 1)
+		modifiedColor = lerp(bgcolor.rgb, bgcolor.rgb - bgcolor.rgb / rcp(bgcolor.rgb), strength);
+	// Square
+	else if (mode == 2)
+		modifiedColor = pow(bgcolor.rgb, 2 * strength);
+	// Freedom :)
+	else if (mode == 3)
+		modifiedColor = stereoSpiral(float4(bgcolor.rgb, 1), normalize(float3(67, -71, 73)), strength);
+	// Acid AKA (Polar Inversion) X (Tan)
+	else if (mode == 4)
+	{
+		modifiedColor = tan(bgcolor.rgb - normalize(bgcolor.rgb)*strength);
+		modifiedColor *= length(bgcolor.rgb) / length(modifiedColor);
+	}
+	// Quantization
+	else
+	{
+		modifiedColor.rgb = bgcolor.rgb;
+
+		float quantization = length(modifiedColor.rgb) * (1.0 - strength*0.01);
+		modifiedColor.rgb = lerp(bgcolor.rgb, floor(modifiedColor.rgb * quantization) / quantization, strength * 0.1);
+	}
+
+	return lerp(bgcolor.rgb, modifiedColor, blend);
 }
 
 half3 applyHSV(half4 bgcolor, float hue, float saturation, float value)

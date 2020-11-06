@@ -274,12 +274,25 @@
 		_CircularVignetteRoundness("Circular Vignette Roundness", Range(0, 1)) = 1
 		_CircularVignetteBegin("Circular Vignette Begin Distance", Float) = 25
 		_CircularVignetteEnd("Circular Vignette End Distance", Float) = 50
+
+		[Enum(None,0, Linear,1, Squared,2, Log2,3, Exponential,4)] _FogType("Fog Type (Requires Directional Light)", Float) = 0
+		_FogColor("Fog Color", Color) = (0, 0, 0, 1)
+		_FogBegin("Fog Begin", Float) = 25
+		_FogEnd("Fog End", Float) = 200
 			
 		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
 		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
 		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
 
 		_ColorMask("Color Mask", Color) = (1, 1, 1, 1)
+
+		_ColorInversionR("Color Inversion R", Float) = 0
+		_ColorInversionG("Color Inversion G", Float) = 0
+		_ColorInversionB("Color Inversion B", Float) = 0
+
+		[Enum(None,0, Rcp,1, Pow,2, Freedom,3, Acid,4, Quantization,5)] _ColorModifierMode("Color Modifier Mode", Float) = 0
+		_ColorModifierStrength("Color Modifier Strength", Float) = 5
+		_ColorModifierBlend("Color Modifier Blend", Float) = 1
 
 		_Hue("Hue", Float) = 0
 		_Saturation("Saturation", Float) = 0
@@ -585,11 +598,24 @@
 			float _VoroniNoiseOffset;
 
 			// Screen color params
+			float _FogType;
+			float4 _FogColor;
+			float _FogBegin;
+			float _FogEnd;
+
 			float4 _EdgelordStripeColor;
 			float _EdgelordStripeSize;
 			float _EdgelordStripeOffset;
 
 			float4 _ColorMask;
+
+			float _ColorInversionR;
+			float _ColorInversionG;
+			float _ColorInversionB;
+
+			float _ColorModifierMode;
+			float _ColorModifierStrength;
+			float _ColorModifierBlend;
 
 			float _Hue;
 			float _Saturation;
@@ -647,7 +673,6 @@
 			struct appdata
 			{
 				float4 vertex : POSITION;
-				float3 normal : NORMAL;
 
 				// For getting particle position and scale
 				float4 uv : TEXCOORD0;
@@ -655,14 +680,14 @@
 
 			struct v2f
 			{
-				float4 worldPos: TEXCOORD1;
-				float3 camFront : TEXCOORD2;
-				float3 camRight : TEXCOORD3;
-				float3 camUp : TEXCOORD4;
-				float3 camPos : TEXCOORD5;
-				float3x3 viewMatRot : TEXCOORD6;
-				float3x3 inverseViewMatRot : TEXCOORD9;
 				float4 pos : SV_POSITION;
+				float4 worldPos: TEXCOORD1;
+				nointerpolation float3 camFront : TEXCOORD2;
+				nointerpolation float3 camRight : TEXCOORD3;
+				nointerpolation float3 camUp : TEXCOORD4;
+				nointerpolation float3 camPos : TEXCOORD5;
+				nointerpolation float3x3 viewMatRot : TEXCOORD6;
+				nointerpolation float3x3 inverseViewMatRot : TEXCOORD9;
 			};
 
 			v2f vert (appdata v)
@@ -769,20 +794,7 @@
 
 				// Projected coordinate space
 				if (_CoordinateSpace == 1)
-				{
-					// Convert from world-axis aligned coordinates to world space coordinates.
-					i.worldPos.xyz = mul(i.inverseViewMatRot, i.worldPos.xyz);
-					i.worldPos.xyz += i.camPos;
-
-					// Reconstruct view coordinates from depth
-					float4 uv = computeStereoUV(i.worldPos);
-					float depth = SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, uv);
-					
-					// Use the length of the reconstructed view ray to adjust our position
-					// and retain the custom world-axis aligned coordinate system.
-					depth = length(viewPosFromDepth(inverse(UNITY_MATRIX_P), uv.xy / uv.w, depth / uv.w));
-					i.worldPos.xyz = worldVector.xyz * depth;
-				}
+					i.worldPos = projectCoordinates(_CameraDepthTexture, i.inverseViewMatRot, i.worldPos, i.camPos, worldVector);
 
 				// Allow for easily changing effect intensities without having to modify
 				// an entire animation. Also very useful for adjusting projected coordinates.
@@ -1108,7 +1120,7 @@
 					half4 displacementVector = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
 						_DisplacementMap, _DisplacementMap_ST, _DisplacementMap_TexelSize,
 						_DisplacementMapColumns, _DisplacementMapRows, _DisplacementMapCount, _DisplacementMapIndex,
-						1.0, _DisplacementMapClamp, _DisplacementMapCutOut,
+						_DisplacementMapClamp, _DisplacementMapCutOut,
 						dropDistortion);
 
 					float displacementAmount = (!dropDistortion)*_DisplacementMapIntensity;
@@ -1289,8 +1301,25 @@
 					else
 						bgcolor += tex2Dproj(_stereoCancerTexture, stereoPosition);
 
+					// Ensure pure black is not captured, which ruins image blending and other effects
+					// such as value adjustment
+					bgcolor.rgb += 0.00000001;
+
 					bgcolor *= _ColorMask;
 				}
+
+				float3 inversionParameters = float3(_ColorInversionR, _ColorInversionG, _ColorInversionB);
+				UNITY_BRANCH
+				if (any(inversionParameters))
+				{
+					float3 invertedColor = length(bgcolor.rgb) - bgcolor.rgb;
+
+					bgcolor.rgb = lerp(bgcolor.rgb, invertedColor.rgb, inversionParameters.rgb);
+				}
+
+				UNITY_BRANCH
+				if (_ColorModifierMode != 0)
+					bgcolor.rgb = colorModifier(bgcolor.rgb, _ColorModifierMode, _ColorModifierStrength, _ColorModifierBlend);
 
 				UNITY_BRANCH
 				if (_TriplanarOpacity != 0)
@@ -1327,6 +1356,19 @@
 					bgcolor.rgb += signalNoise(finishedWorldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
 
 				UNITY_BRANCH
+				if (_FogType != 0)
+				{
+					float4 fogWorldPosition = finishedWorldPos;
+
+					// Fog requires projected coordinates, so if the user isn't using them
+					// then we need to project the coordinates ourself.
+					if (_CoordinateSpace != 1)
+						fogWorldPosition = projectCoordinates(_CameraDepthTexture, i.inverseViewMatRot, finishedWorldPos, i.camPos, normalize(finishedWorldPos));
+
+					bgcolor.rgb = fog(bgcolor.rgb, fogWorldPosition, _FogType, _FogColor, _FogBegin, _FogEnd);
+				}
+
+				UNITY_BRANCH
 				if (_EdgelordStripeSize != 0)
 				{
 					float2 edgelordUV = (stereoPosition.xyz / stereoPosition.w).xy;
@@ -1344,30 +1386,31 @@
 					half4 memeColor = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
 						_MemeTex, _MemeTex_ST, _MemeTex_TexelSize,
 						_MemeImageColumns, _MemeImageRows, _MemeImageCount, _MemeImageIndex,
-						_MemeTexOpacity, _MemeTexClamp, _MemeTexCutOut,
+						_MemeTexClamp, _MemeTexCutOut,
 						dropMemePixels);
 
 					if (dropMemePixels == false)
 					{
 						if (memeColor.a > _MemeTexAlphaCutOff)
 						{
-							// Override Background
-							if (_MemeTexOverrideMode == 1)
+							// No override mode, blend image in.
+							if (_MemeTexOverrideMode == 0)
 							{
-								bgcolor.rgb = memeColor * _MemeTexOpacity;
+								bgcolor.rgb = lerp(bgcolor.rgb, memeColor.rgb, _MemeTexOpacity);
+							}
+							// Override Background
+							else if (_MemeTexOverrideMode == 1)
+							{
+								bgcolor = float4(memeColor.rgb * _MemeTexOpacity, 1);
 							}
 							// Override Empty Space
 							else if (_MemeTexOverrideMode == 2)
 							{
 								if (clearPixel)
 								{
-									bgcolor = memeColor * _MemeTexOpacity;
+									bgcolor = float4(memeColor.rgb * _MemeTexOpacity, 1);
 									return bgcolor;
 								}
-							}
-							else
-							{
-								bgcolor += memeColor * _MemeTexOpacity;
 							}
 						}
 						// Overriding background but pixel has been cutout.
