@@ -190,7 +190,8 @@
 		_RippleDensity("Ripple Density", Float) = 0
 		_RippleAmplitude("Ripple Amplitude", Float) = 0
 		_RippleOffset("Ripple Offset", Float) = 0
-		_RippleFalloff("Ripple Falloff", Float) = 0
+		_RippleInnerFalloff("Ripple Inner Falloff", Float) = 0
+		_RippleOuterFalloff("Ripple Outer Falloff", Float) = 0
 
 		_CheckerboardAngle("Checkerboard Angle", Float) = 0
 		_CheckerboardScale("Checkerboard Scale", Float) = 0
@@ -555,7 +556,8 @@
 			float _RippleDensity;
 			float _RippleAmplitude;
 			float _RippleOffset;
-			float _RippleFalloff;
+			float _RippleInnerFalloff;
+			float _RippleOuterFalloff;
 
 			float _ZigZagXAngle;
 			float _ZigZagXDensity;
@@ -1032,7 +1034,7 @@
 				
 				UNITY_BRANCH
 				if (_RippleAmplitude != 0)
-					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleFalloff);
+					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleInnerFalloff, _RippleOuterFalloff);
 
 				UNITY_BRANCH
 				if (_CheckerboardScale != 0)

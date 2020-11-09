@@ -464,15 +464,19 @@ float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float widt
 	return worldCoordinates;
 }
 
-float4 stereoRipple(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset, float falloff)
+float4 stereoRipple(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset, float innerFalloff, float outerFalloff)
 {
 	float dist = length(worldCoordinates.xy);
 
 	// Allows the user to create a water droplet effect by increasing falloff and offset
 	// together.
 	UNITY_BRANCH
-	if (falloff != 0)
-		amplitude *= clamp((falloff - dist) / falloff, 0, 1);
+	if (innerFalloff != 0)
+		amplitude *= clamp((dist - innerFalloff) / innerFalloff, 0, 1);
+
+	UNITY_BRANCH
+	if (outerFalloff != 0)
+		amplitude *= clamp((outerFalloff - dist) / outerFalloff, 0, 1);
 
 	worldCoordinates.xyz += axis * amplitude * sin(dist * density - offset);
 
