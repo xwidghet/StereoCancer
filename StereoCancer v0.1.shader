@@ -242,6 +242,11 @@
 		_VoroniNoiseBorderStrength("Voroni Noise Border Strength", Float) = 1
 		_VoroniNoiseOffset("Voroni Noise Offset", Float) = 0
 
+		_FanDistance("Fan Distance", Float) = 0
+		_FanScale("Fan Scale", Float) = 5
+		_FanBlades("Fan Blades", Range(1, 12)) = 5
+		_FanOffset("Fan Offset", Float) = 1
+
 		_GeometricDitherDistance("Geometric Dither Distance", Float) = 0
 		_GeometricDitherQuality("Geometric Dither Quality", Range(1, 6)) = 5
 		_GeometricDitherRandomization("Geometric Dither Randomization", Float) = 0
@@ -482,6 +487,11 @@
 			float _SkewYDistance;
 			float _SkewYInterval;
 			float _SkewYOffset;
+
+			float _FanDistance;
+			float _FanScale;
+			float _FanBlades;
+			float _FanOffset;
 
 			float _GeometricDitherDistance;
 			float _GeometricDitherQuality;
@@ -1106,6 +1116,10 @@
 				if (_VoroniNoiseScale != 0 && (_VoroniNoiseStrength != 0 || _VoroniNoiseBorderStrength != 0))
 					i.worldPos = stereoVoroniNoise(i.worldPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
 					
+				UNITY_BRANCH
+				if (_FanDistance != 0 && _FanScale != 0)
+					i.worldPos = fan(i.worldPos, axisRight, axisUp, _FanScale, _FanDistance*0.1, _FanBlades, _FanOffset*0.1);
+
 				UNITY_BRANCH
 				if (_GeometricDitherDistance != 0)
 					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);

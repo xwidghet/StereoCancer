@@ -318,6 +318,23 @@ float4 stereoSkew(float4 worldCoordinates, float3 moveAxis, float flipPoint, flo
 	return worldCoordinates;
 }
 
+float4 fan(float4 worldCoordinates, float3 camRight, float3 camUp, float scale, float distance, float bladeCount, float offset)
+{
+	worldCoordinates /= scale;
+
+	const float skewInterval = 1;
+	for (int i = 0; i < bladeCount; i++)
+	{
+		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, skewInterval, distance, offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, skewInterval, distance, offset);
+
+		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, -skewInterval, -distance, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, -skewInterval, -distance, -offset);
+	}
+
+	return worldCoordinates * scale;
+}
+
 float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, float distance, float quality, float randomization)
 {
 	worldCoordinates *= 10;
@@ -327,7 +344,7 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 	// quality enough to be worth the performance hit
 	UNITY_BRANCH
 	if (randomization != 0)
-		offset = gold_noise(_Time.z, _Time.y)*randomization;
+		offset = gold_noise(fmod(_Time.z, 1), fmod(_Time.y, 1))*randomization;
 
 	// There's probably a way more efficient way to do this,
 	// but it's good enough for now and allows for
@@ -340,8 +357,8 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, distance, offset);
 		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, distance, offset);
 
-		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, -ditherInterval, -distance, -offset);
-		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, -ditherInterval, -distance, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, -distance*4, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, -distance*4, -offset);
 	}
 
 	return worldCoordinates / 10;
@@ -1172,10 +1189,7 @@ half3 colorModifier(half3 bgcolor, float mode, float strength, float blend)
 half3 applyHSV(half4 bgcolor, float hue, float saturation, float value)
 {
 	half3 hsvColor = rgb2hsv(bgcolor.xyz);
-	hsvColor.x += hue;
-	hsvColor.y = clamp(hsvColor.y + saturation, 0, 1);
-
-	hsvColor.z = clamp(hsvColor.z + value, 0, 1);
+	hsvColor.xyz += float3(hue, saturation, value);
 
 	return hsv2rgb(hsvColor);
 }
