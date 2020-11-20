@@ -36,7 +36,7 @@
 
 	Properties
 	{
-		[Header(Rendering Parameters)]
+		// Rendering Parameters
 		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
 		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 		[Enum(Screen,0, Projected (Requires Directional Light),1)] _CoordinateSpace("Coordinate Space", Float) = 0
@@ -47,18 +47,16 @@
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
 
-		[Header(Blending)]
+		// Blending Parameters
 		[Enum(UnityEngine.Rendering.BlendMode)] _SrcFactor("SrcFactor", Float) = 5
 		[Enum(UnityEngine.Rendering.BlendMode)] _DstFactor("DstFactor", Float) = 10
 		_CancerOpacity("Cancer Opacity", Float) = 1
 
 		// VR Effects
-		[Header(Virtual Reality Effects)]
 		_EyeConvergence("Eye Convergence", Range(-3.1415926, 3.1415926)) = 0
 		_EyeSeparation("Eye Separation", Float) = 0
 
 		// Image Effects
-		[Header(Image Overlay)]
 		_MemeTex("Meme Image (RGB)", 2D) = "white" {}
 		_MemeImageColumns("Meme Image Columns", Int) = 1
 		_MemeImageRows("Meme Image Rows", Int) = 1
@@ -72,7 +70,6 @@
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
 
 		// Displacement Map Map Displacement \\/
-		[Header(Displacement Map)]
 		_DisplacementMap("Displacement Map (RGB)", 2D) = "white" {}
 		[Enum(Normal,0, Color,1)] _DisplacementMapType("Displacement Map Type", Int) = 1
 		_DisplacementMapColumns("Displacement Map Columns", Int) = 1
@@ -85,7 +82,6 @@
 		[Enum(No,0, Yes,1)] _DisplacementMapCutOut("Displacement Map Cut Out", Int) = 0
 
 		// Triplanar Map
-		[Header(Triplanar Map)]
 		_TriplanarMap("Triplanar Map (RGB)", 2D) = "white" {}
 		[Enum(Map, 0, Screen, 1)]_TriplanarSampleSrc("Triplanar Sample Source", Float) = 0
 		[Enum(WorldPos, 0, WorldNormal, 1, ViewNormal, 2)]_TriplanarCoordinateSrc("Triplanar Coordinate Source", Float) = 0
@@ -99,7 +95,6 @@
 		_TriplanarOpacity("Triplanar Opacity", Float) = 0
 
 		// Screen Distortion Effects
-		[Header(Screen Distortion Effects)]
 		_ShrinkWidth("Shrink Width", Float) = 0
 		_ShrinkHeight("Shrink Height", Float) = 0
 		
@@ -259,7 +254,6 @@
 		[Enum(Low, 0, High (Requires Directional Light), 1)] _NormalVectorDisplacementQuality("Normal Vector Displacement Quality", Float) = 1
 
 		// Screen color effects
-		[Header(Screen Color Effects)]
 		_SignalNoiseSize("Signal Noise Size", Float) = 0
 		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
@@ -316,17 +310,17 @@
 		_colorSkewRDistance("Red Move Distance", Float) = 0
 		_colorSkewRAngle("Red Move Angle", Float) = 0
 		_colorSkewROpacity("Red Move Opacity", Float) = 0
-		_colorSkewROverride("Red Move Override", Float) = 0
+		[Enum(No, 0, Yes, 1)] _colorSkewROverride("Red Move Override", Float) = 0
 
 		_colorSkewGDistance("Green Move Distance", Float) = 0
 		_colorSkewGAngle("Green Move Angle", Float) = 0
 		_colorSkewGOpacity("Green Move Opacity", Float) = 0
-		_colorSkewGOverride("Green Move Override", Float) = 0
+		[Enum(No, 0, Yes, 1)] _colorSkewGOverride("Green Move Override", Float) = 0
 
 		_colorSkewBDistance("Blue Move Distance", Float) = 0
 		_colorSkewBAngle("Blue Move Angle", Float) = 0
 		_colorSkewBOpacity("Blue Move Opacity", Float) = 0
-		_colorSkewBOverride("Blue Move Override", Float) = 0
+		[Enum(No, 0, Yes, 1)] _colorSkewBOverride("Blue Move Override", Float) = 0
 	}
 	SubShader
 	{
@@ -1536,4 +1530,5 @@
 			ENDCG
 		}
 	}
+	CustomEditor "StereoCancerGUI"
 }
