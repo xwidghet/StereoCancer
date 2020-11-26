@@ -1027,8 +1027,8 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 	// Flat
 	else
 	{
-		greenAbberationPos.xyz -= camFront * (separation) * strength;
-		blueAbberationPos.xyz += camFront * (separation) * strength;
+		greenAbberationPos.xyz += camFront * (separation) * strength;
+		blueAbberationPos.xyz += camFront * (separation*2) * strength;
 	}
 
 	redAbberationPos = computeStereoUV(redAbberationPos);
