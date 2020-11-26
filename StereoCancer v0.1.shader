@@ -43,6 +43,8 @@
 		_CoordinateScale("Coordinate Scale", Float) = 1
 		[Enum(Wrap,0, Cutout,1, Clamp,2)] _WorldSamplingMode("World Sampling Mode", Float) = 0
 		_WorldSamplingRange("World Sampling Range", Range(0, 1)) = 1
+		_CancerEffectRotation("Cancer Effect Rotation", Float) = 0
+		_CancerEffectOffset("Cancer Effect Offset", Vector) = (0,0,0,0)
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
@@ -116,11 +118,11 @@
 
 		_SplitXAngle("Split X Angle", Float) = 0
 		_SplitXDistance("Split X Distance", Float) = 0
-		_SplitXHalf("Split X Half", Float) = 0
+		[Enum(No,0, Yes,1)] _SplitXHalf("Split X Half", Float) = 0
 
 		_SplitYAngle("Split Y Angle", Float) = 0
 		_SplitYDistance("Split Y Distance", Float) = 0
-		_SplitYHalf("Split Y Half", Float) = 0
+		[Enum(No,0, Yes,1)] _SplitYHalf("Split Y Half", Float) = 0
 
 		_SkewXAngle("Skew X Angle", Float) = 0
 		_SkewXDistance("Skew X Distance", Float) = 0
@@ -258,7 +260,7 @@
 		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
 
-		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 42)) = 30
+		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 100)) = 30
 		_BlurMovementTarget("Blur Movement Target", Range(0, 1)) = 0.5
 		_BlurMovementRange("Blur Movement Range", Range(0.001, 1)) = 1
 		_BlurMovementExtrapolation("Blur Movement Extrapolation", Range(0, 1)) = 0
@@ -388,6 +390,8 @@
 			float _CoordinateScale;
 			float _WorldSamplingMode;
 			float _WorldSamplingRange;
+			float _CancerEffectRotation;
+			float4 _CancerEffectOffset;
 			float _Visibility;
 			
 			// Image Overlay params
@@ -762,6 +766,7 @@
 				// This makes it easy to write effects as the coordinates
 				// are all on a 2D XY plane, 100 units away from the camera.
 				o.worldPos.xyz = v.vertex.xyz;
+				
 
 				// If visiblity isn't global...
 				if (_Visibility > 0)
@@ -799,12 +804,21 @@
 				float3 worldVector = normalize(i.worldPos);
 
 				// Projected coordinate space
+				UNITY_BRANCH
 				if (_CoordinateSpace == 1)
 					i.worldPos = projectCoordinates(_CameraDepthTexture, i.inverseViewMatRot, i.worldPos, i.camPos, worldVector);
 
 				// Allow for easily changing effect intensities without having to modify
 				// an entire animation. Also very useful for adjusting projected coordinates.
 				i.worldPos.xyz *= _CoordinateScale;
+
+				// Rotate the effects separately from the screen
+				UNITY_BRANCH
+				if (_CancerEffectRotation != 0)
+					i.worldPos.xy = rotate2D(i.worldPos.xy, _CancerEffectRotation);
+
+				// Move the cancer coordiantes separately from the screen
+				i.worldPos.xyz += _CancerEffectOffset.xyz;
 
 				// Store the starting position to allow for things like using the
 				// derivative (ddx, ddy) to calculate nearby positions to sample depth.
@@ -852,13 +866,13 @@
 
 				UNITY_BRANCH
 				if(_RotationX != 0)
-					i.worldPos = stereoRotate(i.worldPos, axisRight, _RotationX);
+					i.worldPos.zy = rotate2D(i.worldPos.zy, _RotationX);
 				UNITY_BRANCH
 				if (_RotationY != 0)
-					i.worldPos = stereoRotate(i.worldPos, axisUp, _RotationY);
+					i.worldPos.xz = rotate2D(i.worldPos.xz, _RotationY);
 				UNITY_BRANCH
 				if (_RotationZ != 0)
-					i.worldPos = stereoRotate(i.worldPos, axisFront, _RotationZ);
+					i.worldPos.xy = rotate2D(i.worldPos.xy, _RotationZ);
 
 				i.worldPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
 
@@ -873,7 +887,7 @@
 					float flipPoint = i.worldPos.x;
 					UNITY_BRANCH
 					if (_SplitXAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _SplitXAngle).x;
+						flipPoint = rotate2D(i.worldPos.xy, _SplitXAngle).x;
 
 					i.worldPos = stereoSplit(i.worldPos, axisRight, flipPoint, _SplitXDistance, _SplitXHalf, clearPixel);
 				}
@@ -883,7 +897,7 @@
 					float flipPoint = i.worldPos.y;
 					UNITY_BRANCH
 					if (_SplitYAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _SplitYAngle).y;
+						flipPoint = rotate2D(i.worldPos.xy, _SplitYAngle).y;
 
 					i.worldPos = stereoSplit(i.worldPos, axisUp, flipPoint, _SplitYDistance, _SplitYHalf, clearPixel);
 				}
@@ -895,26 +909,26 @@
 				{
 					UNITY_BRANCH
 					if(_SkewXAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _SkewXAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _SkewXAngle);
 
 					i.worldPos = stereoSkew(i.worldPos, axisRight, i.worldPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
 
 					UNITY_BRANCH
 					if (_SkewXAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SkewXAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_SkewXAngle);
 				}
 				UNITY_BRANCH
 				if (_SkewYDistance != 0 && _SkewYInterval != 0)
 				{
 					UNITY_BRANCH
 					if (_SkewYAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _SkewYAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _SkewYAngle);
 
 					i.worldPos = stereoSkew(i.worldPos, axisUp, i.worldPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 
 					UNITY_BRANCH
 					if (_SkewYAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SkewYAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_SkewYAngle);
 				}
 
 				UNITY_BRANCH
@@ -923,7 +937,7 @@
 					float flipPoint = i.worldPos.y;
 					UNITY_BRANCH
 					if (_BarXAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _BarXAngle).y;
+						flipPoint = rotate2D(i.worldPos.xy, _BarXAngle).y;
 
 					i.worldPos = stereoBar(i.worldPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
 				}
@@ -933,7 +947,7 @@
 					float flipPoint = i.worldPos.x;
 					UNITY_BRANCH
 					if (_BarYAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _BarYAngle).x;
+						flipPoint = rotate2D(i.worldPos.xy, _BarYAngle).x;
 
 					i.worldPos = stereoBar(i.worldPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
 				}
@@ -944,7 +958,7 @@
 					float flipPoint = i.worldPos.y;
 					UNITY_BRANCH
 					if (_SinBarXAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _SinBarXAngle).y;
+						flipPoint = rotate2D(i.worldPos.xy, _SinBarXAngle).y;
 
 					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
 				}
@@ -954,7 +968,7 @@
 					float flipPoint = i.worldPos.x;
 					UNITY_BRANCH
 					if (_SinBarYAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _SinBarYAngle).x;
+						flipPoint = rotate2D(i.worldPos.xy, _SinBarYAngle).x;
 
 					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
 				}
@@ -965,7 +979,7 @@
 					float flipPoint = i.worldPos.y;
 					UNITY_BRANCH
 					if (_ZigZagXAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _ZigZagXAngle).y;
+						flipPoint = rotate2D(i.worldPos.xy, _ZigZagXAngle).y;
 
 					i.worldPos = stereoZigZag(i.worldPos, axisRight, flipPoint, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
 				}
@@ -975,7 +989,7 @@
 					float flipPoint = i.worldPos.x;
 					UNITY_BRANCH
 					if (_ZigZagYAngle != 0)
-						flipPoint = stereoRotate(i.worldPos, axisFront, _ZigZagYAngle).x;
+						flipPoint = rotate2D(i.worldPos.xy, _ZigZagYAngle).x;
 
 					i.worldPos = stereoZigZag(i.worldPos, axisUp, flipPoint, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 				}
@@ -987,15 +1001,15 @@
 					UNITY_BRANCH
 					if (_SinWaveAngle != 0)
 					{
-						axis = stereoRotate(float4(axis, 0), axisFront, _SinWaveAngle);
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _SinWaveAngle);
+						axis.xy = rotate2D(axis.xy, _SinWaveAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _SinWaveAngle);
 					}
 
 					i.worldPos = stereoSinWave(i.worldPos, axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
 
 					UNITY_BRANCH
 					if (_SinWaveAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_SinWaveAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_SinWaveAngle);
 				}
 				UNITY_BRANCH
 				if (_CosWaveDensity != 0)
@@ -1004,15 +1018,15 @@
 					UNITY_BRANCH
 					if (_CosWaveAngle != 0)
 					{
-						axis = stereoRotate(float4(axis, 0), axisFront, _CosWaveAngle);
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _CosWaveAngle);
+						axis.xy = rotate2D(axis.xy, _CosWaveAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _CosWaveAngle);
 					}
 
 					i.worldPos = stereoCosWave(i.worldPos, axis, _CosWaveDensity / 100, _CosWaveAmplitude, _CosWaveOffset);
 
 					UNITY_BRANCH
 					if (_CosWaveAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_CosWaveAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_CosWaveAngle);
 				}
 				UNITY_BRANCH
 				if (_TanWaveDensity != 0)
@@ -1021,15 +1035,15 @@
 					UNITY_BRANCH
 					if (_TanWaveAngle != 0)
 					{
-						axis = stereoRotate(float4(axis, 0), axisFront, _TanWaveAngle);
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _TanWaveAngle);
+						axis.xy = rotate2D(axis.xy, _TanWaveAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _TanWaveAngle);
 					}
 
 					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
 
 					UNITY_BRANCH
 					if (_TanWaveAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_TanWaveAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_TanWaveAngle);
 				}
 
 				UNITY_BRANCH
@@ -1050,7 +1064,7 @@
 
 				UNITY_BRANCH
 				if (_RingRotationWidth != 0)
-					i.worldPos = stereoRingRotation(i.worldPos, axisFront, _RingRotationInnerAngle, _RingRotationOuterAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
+					i.worldPos = stereoRingRotation(i.worldPos, _RingRotationInnerAngle, _RingRotationOuterAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
 
 				UNITY_BRANCH
 				if (_WarpIntensity != 0)
@@ -1058,7 +1072,7 @@
 
 				UNITY_BRANCH
 				if (_SpiralIntensity != 0)
-					i.worldPos = stereoSpiral(i.worldPos, axisFront, _SpiralIntensity / 1000);
+					i.worldPos = stereoSpiral(i.worldPos, _SpiralIntensity / 1000);
 
 				UNITY_BRANCH
 				if (_PolarInversionIntensity != 0)
@@ -1070,20 +1084,20 @@
 
 				UNITY_BRANCH
 				if(_KaleidoscopeSegments > 0)
-					i.worldPos = stereoKaleidoscope(i.worldPos, axisFront, _KaleidoscopeAngle, _KaleidoscopeSegments);
+					i.worldPos = stereoKaleidoscope(i.worldPos, _KaleidoscopeAngle, _KaleidoscopeSegments);
 
 				UNITY_BRANCH
 				if (_BlockDisplacementSize != 0)
 				{
 					UNITY_BRANCH
 					if (_BlockDisplacementAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _BlockDisplacementAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _BlockDisplacementAngle);
 
 					i.worldPos = stereoBlockDisplacement(i.worldPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
 
 					UNITY_BRANCH
 					if (_BlockDisplacementAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_BlockDisplacementAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_BlockDisplacementAngle);
 				}
 
 				// Think you have enough function parameters there buddy?
@@ -1092,7 +1106,7 @@
 				{
 					UNITY_BRANCH
 					if (_GlitchAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, _GlitchAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, _GlitchAngle);
 
 					i.worldPos = stereoGlitch(i.worldPos, axisFront, axisRight, axisUp,
 						_GlitchCount, _MinGlitchWidth, _MinGlitchHeight, _MaxGlitchWidth, 
@@ -1100,7 +1114,7 @@
 
 					UNITY_BRANCH
 					if (_GlitchAngle != 0)
-						i.worldPos = stereoRotate(i.worldPos, axisFront, -_GlitchAngle);
+						i.worldPos.xy = rotate2D(i.worldPos.xy, -_GlitchAngle);
 				}
 
 				UNITY_BRANCH
@@ -1124,7 +1138,7 @@
 				{
 					float4 samplePosition = i.worldPos;
 					if (_DisplacementMapAngle != 0)
-						samplePosition.xyz = mul(rotAxis(axisFront, _DisplacementMapAngle), samplePosition.xyz);
+						samplePosition.xy = rotate2D(samplePosition.xy, _DisplacementMapAngle);
 
 					bool dropDistortion = false;
 					half4 displacementVector = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
@@ -1278,6 +1292,21 @@
 						stereoPosition = computeStereoUV(i.worldPos);
 					}
 				}
+
+				// Undo the cancer effect offset and rotation for ONLY the screen sample coordinates
+				// This allows for moving effects around without affecting the screen.
+				// Ex. Meme spotlight movement via Vignette 
+				UNITY_BRANCH
+				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0)
+				{
+					float4 temp = finishedWorldPos;
+					temp.xyz -= _CancerEffectOffset.xyz;
+					temp.xy = rotate2D(temp.xy, -_CancerEffectRotation);
+
+					temp.xyz = mul(i.inverseViewMatRot, temp.xyz);
+					temp.xyz += i.camPos;
+					stereoPosition = computeStereoUV(temp);
+				}
 				
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
@@ -1390,7 +1419,7 @@
 				{
 					float4 samplePosition = finishedWorldPos;
 					if (_MemeImageAngle != 0)
-						samplePosition.xyz = mul(rotAxis(axisFront, _MemeImageAngle), samplePosition.xyz);
+						samplePosition.xy = rotate2D(samplePosition.xy, _MemeImageAngle);
 
 					bool dropMemePixels = false;
 					half4 memeColor = stereoImageOverlay(samplePosition, startingAxisAlignedPos,

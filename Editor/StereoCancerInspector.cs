@@ -77,6 +77,8 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CoordinateScale = null;
     MaterialProperty _WorldSamplingMode = null;
     MaterialProperty _WorldSamplingRange = null;
+    MaterialProperty _CancerEffectRotation = null;
+    MaterialProperty _CancerEffectOffset = null;
     MaterialProperty _Visibility = null;
 
     // Image Overlay params
@@ -415,6 +417,8 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_CoordinateScale, new GUIContent("Coordinate Scale", "Adjust the scale of the screen-space cancer coordinates. Useful for adjusting 'Projected' coordinates and making final adjustments to animations."));
             materialEditor.ShaderProperty(_WorldSamplingMode, new GUIContent("World Sampling Mode", "Select how the screen texture is sampled based on the cancer coordinates."));
             materialEditor.ShaderProperty(_WorldSamplingRange, new GUIContent("World Sampling Range", "Adjust the cancer coordinate sampling range used for the currently selected 'World Sampling Mode'."));
+            materialEditor.ShaderProperty(_CancerEffectRotation, new GUIContent("Cancer Effect Rotation", "Adjust the rotation of the cancer effects separately from the rotation of the screen."));
+            materialEditor.ShaderProperty(_CancerEffectOffset, new GUIContent("Cancer Effect Offset", "Adjust the movement of the cancer effects separately from the movement of the screen."));
             materialEditor.ShaderProperty(_Visibility, new GUIContent("Visibility", "Select which users should see the cancer effects. Settings other than 'Global' require that the object containing the StereoCancer material is parented to your avatar's head, and has a scale of 10,000 or greater."));
             materialEditor.ShaderProperty(_ParticleSystem, new GUIContent("Particle System", "Select 'Yes' when the material is on a particle."));
 
@@ -531,16 +535,16 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionShink)
             {
                 materialEditor.ShaderProperty(_ShrinkWidth, new GUIContent("Shrink Width", "Shrink or expand the width of the viewer's screen."));
-                materialEditor.ShaderProperty(_ShrinkHeight, new GUIContent("Shirnk Height", "Shrink or expand the height of the viewer's screen"));
+                materialEditor.ShaderProperty(_ShrinkHeight, new GUIContent("Shrink Height", "Shrink or expand the height of the viewer's screen"));
             }
 
             displayDistortionRotation = EditorGUILayout.Foldout(displayDistortionRotation, "Screen Rotation", true, scFoldoutStyle);
 
             if (displayDistortionRotation)
             {
-                materialEditor.ShaderProperty(_RotationX, new GUIContent("Rotation X", "Pitch the screen down with positive values, and up with negative values."));
-                materialEditor.ShaderProperty(_RotationY, new GUIContent("Rotation Y", "Turn the screen left with positive values, and right with negative values."));
-                materialEditor.ShaderProperty(_RotationZ, new GUIContent("Rotation Z", "Roll the screen right with positive values, and left with negative values."));
+                materialEditor.ShaderProperty(_RotationX, new GUIContent("Pitch", "Pitch the screen down with positive values, and up with negative values."));
+                materialEditor.ShaderProperty(_RotationY, new GUIContent("Yaw", "Yaw the screen left with positive values, and right with negative values."));
+                materialEditor.ShaderProperty(_RotationZ, new GUIContent("Roll", "Roll the screen right with positive values, and left with negative values."));
             }
 
             displayDistortionMovement = EditorGUILayout.Foldout(displayDistortionMovement, "Screen Movement", true, scFoldoutStyle);
@@ -571,11 +575,11 @@ public class StereoCancerGUI : ShaderGUI
             {
                 materialEditor.ShaderProperty(_SplitXAngle, new GUIContent("Horizontal Split Angle", "Adjust the angle of the horizontal screen split."));
                 materialEditor.ShaderProperty(_SplitXDistance, new GUIContent("Horizontal Split Distance", "Push the sides of the screen apart with positive values, and together with negative values."));
-                materialEditor.ShaderProperty(_SplitXHalf, new GUIContent("Horizontal Split Half", "Select if the screen should split both sides apart (0), or just the left (Negative) or right half (Positive)."));
+                materialEditor.ShaderProperty(_SplitXHalf, new GUIContent("Horizontal Split Half", "Select 'Yes' if only half of the screen should be split apart. When enabled, positive values will split apart the right side, and negative values will split apart the left side."));
                 GUILayout.Space(20);
                 materialEditor.ShaderProperty(_SplitYAngle, new GUIContent("Vertical Split Angle", "Adjust the angle of the vertical screen split."));
                 materialEditor.ShaderProperty(_SplitYDistance, new GUIContent("Vertical Split Distance", "Push the sides of the screen apart with positive values, and together with negative values."));
-                materialEditor.ShaderProperty(_SplitYHalf, new GUIContent("Vertical Split Half", "Select if the screen should split both sides apart(0), or just the bottom (Negative) or top half (Positive)"));
+                materialEditor.ShaderProperty(_SplitYHalf, new GUIContent("Vertical Split Half", "Select 'Yes' if only half of the screen should be split apart. When enabled, positive values will split apart the bottom side, and negative values will split apart the top side."));
             }
 
             displayDistortionSkew = EditorGUILayout.Foldout(displayDistortionSkew, "Alternating Skew", true, scFoldoutStyle);
@@ -626,14 +630,14 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionZigZag)
             {
                 materialEditor.ShaderProperty(_ZigZagXAngle, new GUIContent("Horizontal Zigzag Angle", "Adjust the angle of the horizontal screen zigzag."));
-                materialEditor.ShaderProperty(_ZigZagXDensity, new GUIContent("Horizontal Zigzag Distance", "Adjust the distance between the zigzag direction changes."));
-                materialEditor.ShaderProperty(_ZigZagXAmplitude, new GUIContent("Horizontal Zigzag Interval", "Adjust how far the zigzag shifts the screen."));
+                materialEditor.ShaderProperty(_ZigZagXAmplitude, new GUIContent("Horizontal Zigzag Distance", "Adjust how far the zigzag shifts the screen."));
+                materialEditor.ShaderProperty(_ZigZagXDensity, new GUIContent("Horizontal Zigzag Interval", "Adjust the distance between the zigzag direction changes."));
                 materialEditor.ShaderProperty(_ZigZagXOffset, new GUIContent("Horizontal Zigzag Offset", "Adjust the offset of the zigzag points."));
                 GUILayout.Space(20);
-                materialEditor.ShaderProperty(_ZigZagYAngle, new GUIContent("Horizontal Zigzag Angle", "Adjust the angle of the vertical screen zigzag."));
-                materialEditor.ShaderProperty(_ZigZagYDensity, new GUIContent("Horizontal Zigzag Distance", "Adjust the distance between the zigzag direction changes."));
-                materialEditor.ShaderProperty(_ZigZagYAmplitude, new GUIContent("Horizontal Zigzag Interval", "Adjust how far the zigzag shifts the screen."));
-                materialEditor.ShaderProperty(_ZigZagYOffset, new GUIContent("Horizontal Zigzag Offset", "Adjust the offset of the zigzag points."));
+                materialEditor.ShaderProperty(_ZigZagYAngle, new GUIContent("Vertical Zigzag Angle", "Adjust the angle of the vertical screen zigzag."));
+                materialEditor.ShaderProperty(_ZigZagYAmplitude, new GUIContent("Vertical Zigzag Distance", "Adjust how far the zigzag shifts the screen."));
+                materialEditor.ShaderProperty(_ZigZagYDensity, new GUIContent("Vertical Zigzag Interval", "Adjust the distance between the zigzag direction changes."));
+                materialEditor.ShaderProperty(_ZigZagYOffset, new GUIContent("Vertical Zigzag Offset", "Adjust the offset of the zigzag points."));
             }
 
             displayDistortionSinWave = EditorGUILayout.Foldout(displayDistortionSinWave, "Sin Wave", true, scFoldoutStyle);
@@ -641,8 +645,8 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionSinWave)
             {
                 materialEditor.ShaderProperty(_SinWaveAngle, new GUIContent("Sin Wave Angle", "Adjust the angle of the horizontal screen sin wave."));
-                materialEditor.ShaderProperty(_SinWaveDensity, new GUIContent("Sin Wave Distance", "Adjust the distance between the sin wave direction changes."));
-                materialEditor.ShaderProperty(_SinWaveAmplitude, new GUIContent("Sin Wave Interval", "Adjust how far the sin wave shifts the screen."));
+                materialEditor.ShaderProperty(_SinWaveAmplitude, new GUIContent("Sin Wave Distance", "Adjust how far the sin wave shifts the screen."));
+                materialEditor.ShaderProperty(_SinWaveDensity, new GUIContent("Sin Wave Density", "Adjust the distance between the sin wave direction changes."));
                 materialEditor.ShaderProperty(_SinWaveOffset, new GUIContent("Sin Wave Offset", "Adjust the offset of the sin wave points."));
             }
 
@@ -651,8 +655,8 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionCosWave)
             {
                 materialEditor.ShaderProperty(_CosWaveAngle, new GUIContent("Cos Wave Angle", "Adjust the angle of the horizontal screen cosine wave."));
-                materialEditor.ShaderProperty(_CosWaveDensity, new GUIContent("Cos Wave Distance", "Adjust the distance between the cosine wave direction changes."));
-                materialEditor.ShaderProperty(_CosWaveAmplitude, new GUIContent("Cos Wave Interval", "Adjust how far the cosine wave shifts the screen."));
+                materialEditor.ShaderProperty(_CosWaveAmplitude, new GUIContent("Cos Wave Distance", "Adjust how far the cosine wave shifts the screen."));
+                materialEditor.ShaderProperty(_CosWaveDensity, new GUIContent("Cos Wave Density", "Adjust the distance between the cosine wave direction changes."));
                 materialEditor.ShaderProperty(_CosWaveOffset, new GUIContent("Cos Wave Offset", "Adjust the offset of the cosine wave points."));
             }
 
@@ -661,8 +665,8 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionTanWave)
             {
                 materialEditor.ShaderProperty(_TanWaveAngle, new GUIContent("Tan Wave Angle", "Adjust the angle of the horizontal screen tangent wave."));
-                materialEditor.ShaderProperty(_TanWaveDensity, new GUIContent("Tan Wave Distance", "Adjust the distance between the tangent wave direction changes."));
-                materialEditor.ShaderProperty(_TanWaveAmplitude, new GUIContent("Tan Wave Interval", "Adjust how far the tangent wave shifts the screen."));
+                materialEditor.ShaderProperty(_TanWaveAmplitude, new GUIContent("Tan Wave Distance", "Adjust how far the tangent wave shifts the screen."));
+                materialEditor.ShaderProperty(_TanWaveDensity, new GUIContent("Tan Wave Density", "Adjust the distance between the tangent wave direction changes."));
                 materialEditor.ShaderProperty(_TanWaveOffset, new GUIContent("Tan Wave Offset", "Adjust the offset of the tangent wave points."));
             }
 
@@ -670,10 +674,10 @@ public class StereoCancerGUI : ShaderGUI
 
             if (displayDistortionSlice)
             {
-                materialEditor.ShaderProperty(_TanWaveAngle, new GUIContent("Slice Angle", "Adjust the angle of the screen slice."));
-                materialEditor.ShaderProperty(_TanWaveOffset, new GUIContent("Slice Offset", "Adjust the offset of the slice from the center of the screen. The slice angle controls which direction the offset pushes the slice."));
-                materialEditor.ShaderProperty(_TanWaveDensity, new GUIContent("Slice Width", "Adjust the width of the screen slice."));
-                materialEditor.ShaderProperty(_TanWaveAmplitude, new GUIContent("Slice Distance", "Adjust how far the screen slice shifts the screen."));
+                materialEditor.ShaderProperty(_SliceAngle, new GUIContent("Slice Angle", "Adjust the angle of the screen slice."));
+                materialEditor.ShaderProperty(_SliceOffset, new GUIContent("Slice Offset", "Adjust the offset of the slice from the center of the screen. The slice angle controls which direction the offset pushes the slice."));
+                materialEditor.ShaderProperty(_SliceWidth, new GUIContent("Slice Width", "Adjust the width of the screen slice."));
+                materialEditor.ShaderProperty(_SliceDistance, new GUIContent("Slice Distance", "Adjust how far the screen slice shifts the screen."));
             }
 
             displayDistortionRipple = EditorGUILayout.Foldout(displayDistortionRipple, "Water Ripple", true, scFoldoutStyle);
@@ -812,7 +816,7 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionGeometricDither)
             {
                 materialEditor.ShaderProperty(_GeometricDitherDistance, new GUIContent("Geometric Dither Distance", "Adjust the distance the pixels are geometrically dithered away from their original position."));
-                materialEditor.ShaderProperty(_GeometricDitherQuality, new GUIContent("Geometric Dither Scale", "Adjust the quality of the dither effect."));
+                materialEditor.ShaderProperty(_GeometricDitherQuality, new GUIContent("Geometric Dither Quality", "Adjust the quality of the dither effect."));
                 materialEditor.ShaderProperty(_GeometricDitherRandomization, new GUIContent("Geometric Dither Randomization", "Adjust how quickly the dither effect is randomly moved around."));
             }
 

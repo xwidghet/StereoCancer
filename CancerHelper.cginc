@@ -350,6 +350,19 @@ float angleToWorldCoordinate(float4 worldCoordinates, float3 camFront)
 	return(acos(dot(worldVector, camFront)));
 }
 
+// Rotate 2D without hardcoded elements to allow for
+// utilizing swizzling to rotate around various axis.
+float2 rotate2D(float2 coordinates, float angle)
+{
+	// Angle is negative to retain the same rotation direction
+	// as rotAxis.
+	float tempX = coordinates.x;
+	coordinates.x = cos(-angle)*tempX - sin(-angle)*coordinates.y;
+	coordinates.y = sin(-angle)*tempX + cos(-angle)*coordinates.y;
+
+	return coordinates;
+}
+
 float2 reverseTransformStereoScreenSpaceTex(float2 uv, float w)
 {
 	// Original forward version from UnityCG.cginc

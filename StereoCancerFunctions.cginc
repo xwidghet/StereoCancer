@@ -395,32 +395,47 @@ float4 stereoQuantization(float4 worldCoordinates, float scale)
 	return worldCoordinates;
 }
 
-float4 stereoRingRotation(float4 worldCoordinates,float3 camFront, float innerAngle, float outerAngle, float ringRadius, float ringWidth)
+float4 stereoRingRotation(float4 worldCoordinates, float innerAngle, float outerAngle, float ringRadius, float ringWidth)
 {
 	// Not sure of what the best way is to make this intuitive to new users to use.
 	// If the user only changes ringWidth and not radius then their screen will be
 	// flipped upside-down.
 	float3 toWorldVector = normalize(worldCoordinates);
-	float AngleToFront = acos(dot(toWorldVector, camFront));
+	float AngleToFront = acos(dot(toWorldVector, float3(0,0,-1)));
 
 	UNITY_BRANCH
 	if (fmod(abs(AngleToFront), ringRadius - ringWidth) > ringRadius)
-		worldCoordinates = stereoRotate(worldCoordinates, camFront, outerAngle);
+		worldCoordinates.xy = rotate2D(worldCoordinates.xy, outerAngle);
 	else
-		worldCoordinates = stereoRotate(worldCoordinates, camFront, innerAngle);
+		worldCoordinates.xy = rotate2D(worldCoordinates.xy, innerAngle);
 
 	return worldCoordinates;
 }
 
-float4 stereoSpiral(float4 worldCoordinates, float3 camFront, float intensity)
+float4 stereoSpiral(float4 worldCoordinates, float intensity)
 {
 	float3 worldVector = worldCoordinates.xyz;
 	float dist = length(worldVector);
 	worldVector = normalize(worldVector);
 
-	float angleToWorldVector = acos(dot(worldVector, camFront));
+	float angleToWorldVector = acos(dot(worldVector, float3(0,0,-1)));
 
-	worldCoordinates.xyz = mul(rotAxis(camFront, dist*angleToWorldVector*intensity), worldCoordinates.xyz);
+	worldCoordinates.xy = rotate2D(worldCoordinates.xy, dist*angleToWorldVector*intensity);
+
+	return worldCoordinates;
+}
+
+// rotAxis version of spiral for usage in effects such as
+// freedom color modifier.
+float4 stereoSpiralAxis(float4 worldCoordinates, float3 axis, float intensity)
+{
+	float3 worldVector = worldCoordinates.xyz;
+	float dist = length(worldVector);
+	worldVector = normalize(worldVector);
+
+	float angleToWorldVector = acos(dot(worldVector, axis));
+
+	worldCoordinates.xyz = mul(rotAxis(axis, dist*angleToWorldVector*intensity), worldCoordinates.xyz);
 
 	return worldCoordinates;
 }
@@ -468,15 +483,16 @@ float4 stereoTanWave(float4 worldCoordinates, float3 axis, float density, float 
 
 float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance, float offset)
 {
-	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), angle), worldCoordinates.xyz);
-	worldCoordinates.xyz.x += offset;
+	worldCoordinates.xy = rotate2D(worldCoordinates.xy, -angle);
+
+	worldCoordinates.x += offset;
 
 	UNITY_BRANCH
 	if (abs(worldCoordinates.x) <= width)
 		worldCoordinates.xyz += axis*distance;
 
-	worldCoordinates.xyz.x -= offset;
-	worldCoordinates.xyz = mul(rotAxis(float3(0, 0, 1), -angle), worldCoordinates.xyz);
+	worldCoordinates.x -= offset;
+	worldCoordinates.xy = rotate2D(worldCoordinates.xy, angle);
 
 	return worldCoordinates;
 }
@@ -589,7 +605,7 @@ float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, f
 	return worldCoordinates;
 }
 
-float4 stereoKaleidoscope(float4 worldCoordinates, float3 camFront, float angle, float segments)
+float4 stereoKaleidoscope(float4 worldCoordinates, float angle, float segments)
 {
 	float segmentOffset = clamp(UNITY_PI / segments, 0, UNITY_PI);
 
@@ -597,12 +613,13 @@ float4 stereoKaleidoscope(float4 worldCoordinates, float3 camFront, float angle,
 	// partial segment (if any) without executing a conditional
 	// every loop.
 	int i = 0;
+	
 	for (; i < segments; i++)
 	{
 		worldCoordinates.x = abs(worldCoordinates.x);
-		worldCoordinates = stereoRotate(worldCoordinates, camFront, angle);
+		worldCoordinates.xy = rotate2D(worldCoordinates.xy, angle);
 		worldCoordinates.x = abs(worldCoordinates.x);
-		worldCoordinates = stereoRotate(worldCoordinates, camFront, -angle);
+		worldCoordinates.xy = rotate2D(worldCoordinates.xy, -angle);
 
 		angle += segmentOffset;
 	}
@@ -613,9 +630,9 @@ float4 stereoKaleidoscope(float4 worldCoordinates, float3 camFront, float angle,
 	angle += (segments - i) * segmentOffset;
 
 	worldCoordinates.x = abs(worldCoordinates.x);
-	worldCoordinates = stereoRotate(worldCoordinates, camFront, angle);
+	worldCoordinates.xy = rotate2D(worldCoordinates.xy, angle);
 	worldCoordinates.x = abs(worldCoordinates.x);
-	worldCoordinates = stereoRotate(worldCoordinates, camFront, -angle);
+	worldCoordinates.xy = rotate2D(worldCoordinates.xy, -angle);
 
 	return worldCoordinates;
 }
@@ -1167,7 +1184,7 @@ half3 colorModifier(half3 bgcolor, float mode, float strength, float blend)
 		modifiedColor = pow(bgcolor.rgb, 2 * strength);
 	// Freedom :)
 	else if (mode == 3)
-		modifiedColor = stereoSpiral(float4(bgcolor.rgb, 1), normalize(float3(67, -71, 73)), strength);
+		modifiedColor = stereoSpiralAxis(float4(bgcolor.rgb, 1), normalize(float3(67, -71, 73)), strength);
 	// Acid AKA (Polar Inversion) X (Tan)
 	else if (mode == 4)
 	{
@@ -1203,7 +1220,7 @@ half3 imaginaryColors(float3 worldVector, float angle)
 	angle += (UNITY_HALF_PI) * step(1, unity_StereoEyeIndex);
 #endif
 
-	worldVector = mul(rotAxis(float3(0, 0, 1), angle), worldVector);
+	worldVector.xy = rotate2D(worldVector.xy, -angle);
 
 	// Don't worry about it :>)
 	worldVector.xyz *= worldVector.zxy;
