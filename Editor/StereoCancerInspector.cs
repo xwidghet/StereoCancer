@@ -1,11 +1,18 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System;
+using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Text;
 using UnityEngine;
 using UnityEditor;
 
 public class StereoCancerGUI : ShaderGUI
 {
+    // Custom render layer data
+    string grabPassName = "newStereoCancerLayer";
+
     // GUIStyles
     GUIStyle scFoldoutStyle;
 
@@ -13,6 +20,7 @@ public class StereoCancerGUI : ShaderGUI
     bool displayRawParameters = false;
 
     // Main parameter category foldout states
+    bool displayLayerParameters = false;
     bool displayRenderParameters = false;
     bool displayBlendingParameters = false;
     bool displayVRParameters = false;
@@ -393,6 +401,7 @@ public class StereoCancerGUI : ShaderGUI
             scFoldoutStyle = StereoCancerCSS.createSCFoldOutStyle();
             Material material = materialEditor.target as Material;
 
+            drawLayerParameters(materialEditor, material, properties);
             drawRenderParameters(materialEditor, properties);
             drawBlendingParamters(materialEditor, properties);
             drawOverlayParameters(materialEditor, properties);
@@ -401,6 +410,109 @@ public class StereoCancerGUI : ShaderGUI
             drawVRParamters(materialEditor, properties);
             drawDistortionParamters(materialEditor, properties);
             drawColorParamters(materialEditor, properties);
+        }
+    }
+
+    public void drawLayerParameters(MaterialEditor materialEditor, Material material, MaterialProperty[] properties)
+    {
+        displayLayerParameters = EditorGUILayout.Foldout(displayLayerParameters, "Layer Parameters", true, scFoldoutStyle);
+
+        if (displayLayerParameters == true)
+        {
+            materialEditor.RenderQueueField();
+            GUILayout.Space(20);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("New Layer Name: ");
+
+            GUIStyle textLabelAlignmentStyle = new GUIStyle(EditorStyles.textField);
+            textLabelAlignmentStyle.alignment = TextAnchor.MiddleRight;
+
+            grabPassName = GUILayout.TextField(grabPassName, 31, textLabelAlignmentStyle);
+            GUILayout.EndHorizontal();
+
+            // Inspired by AkaiMage's render queue exporting from CancerSpace
+            // https://github.com/AkaiMage/VRC-Cancerspace/blob/5118fc7c40977f73791d39fe3929e90c14eb5f77/Editor/CancerspaceInspector.cs#L430
+            bool createLayer = GUILayout.Button("Create New Layer");
+            if (createLayer)
+            {
+                // Separate the internal grab pass name to avoid users becoming confused
+                // when an underscore suddenly appears in their custom name.
+                // This also avoids the issue of appending more and more underscores to
+                // the start when the user creates multiple layers.
+                StringBuilder sb = new StringBuilder("_", 32);
+
+                // Sanitize the user's input to ensure they don't try to create
+                // a layer using characters incompatibile with file and grab pass
+                // names. 
+                Regex rx = new Regex(@"^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+
+                foreach(var matchingCharacters in rx.Matches(grabPassName))
+                {
+                    sb.Append(matchingCharacters);
+                }
+                string internalGrabPassName = sb.ToString();
+
+                if (internalGrabPassName.Length == 1 || internalGrabPassName.Length != (grabPassName.Length + 1))
+                {
+                    Debug.LogError("New Layer Name must be at least 1 character long and consist of only english characters.");
+                }
+                else
+                {
+                    string shaderPath = AssetDatabase.GetAssetPath(material.shader.GetInstanceID());
+
+                    // Grab the base shader for easy grab pass replacement. If the user decided to
+                    // rename my shader then that's their problem. :)
+                    shaderPath = shaderPath.Substring(0, shaderPath.IndexOf("v0.1") + 4);
+
+                    string outputLocation = shaderPath + internalGrabPassName + ".shader";
+                    shaderPath += ".shader";
+
+                    if (File.Exists(outputLocation))
+                    {
+                        Debug.LogError("A layer with this name was already created. Please choose a new name.");
+                    }
+                    else
+                    {
+                        try
+                        {
+                            using (StreamWriter sw = new StreamWriter(outputLocation))
+                            {
+                                using (StreamReader sr = new StreamReader(shaderPath))
+                                {
+                                    string line;
+                                    while ((line = sr.ReadLine()) != null)
+                                    {
+                                        if (line.Contains("Shader \"xwidghet/"))
+                                        {
+                                            line = "Shader \"xwidghet/StereoCancer v0.1" + internalGrabPassName + "\"";
+                                        }
+                                        else
+                                        {
+                                            line = line.Replace("_stereoCancerTexture", internalGrabPassName);
+                                        }
+
+                                        sw.Write(line);
+                                        sw.WriteLine();
+                                    }
+                                }
+                            }
+
+                            AssetDatabase.Refresh();
+
+                            string customShaderLayerPath = "xwidghet/StereoCancer v0.1" + internalGrabPassName;
+                            material.shader = Shader.Find(customShaderLayerPath);
+
+                            AssetDatabase.SaveAssets();
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogError("Failed to create a new layer. Either the shader failed to be read, or the layer failed to be created.");
+                            Debug.LogError(e.Message);
+                        }
+                    }
+                }
+            }
         }
     }
 
