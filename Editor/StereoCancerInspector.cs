@@ -64,6 +64,7 @@ public class StereoCancerGUI : ShaderGUI
     // End distortion effect foldout states
 
     // Begin color effect foldout states
+    bool displayEmptySpace = false;
     bool displaySignalNoise = false;
     bool displayBlurMovement = false;
     bool displayChromaticAberration = false;
@@ -305,6 +306,8 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _VoroniNoiseOffset = null;
 
     // Screen color params
+    MaterialProperty _EmptySpaceColor = null;
+
     MaterialProperty _FogType = null;
     MaterialProperty _FogColor = null;
     MaterialProperty _FogBegin = null;
@@ -527,7 +530,7 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_ScreenSamplingMode, new GUIContent("Screen Sampling Mode", "Select how the screen texture is sampled when pixels go outside of the screen/eye."));
             materialEditor.ShaderProperty(_CoordinateSpace, new GUIContent("Coordinate Space", "Select if the cancer coordinates should be a flat 'Screen' plane, or 'Projected' onto the scene like a flashlight."));
             materialEditor.ShaderProperty(_CoordinateScale, new GUIContent("Coordinate Scale", "Adjust the scale of the screen-space cancer coordinates. Useful for adjusting 'Projected' coordinates and making final adjustments to animations."));
-            materialEditor.ShaderProperty(_WorldSamplingMode, new GUIContent("World Sampling Mode", "Select how the screen texture is sampled based on the cancer coordinates."));
+            materialEditor.ShaderProperty(_WorldSamplingMode, new GUIContent("World Sampling Mode", "Select how the screen texture is sampled when the coordinates exit the World Sampling Range."));
             materialEditor.ShaderProperty(_WorldSamplingRange, new GUIContent("World Sampling Range", "Adjust the cancer coordinate sampling range used for the currently selected 'World Sampling Mode'."));
             materialEditor.ShaderProperty(_CancerEffectRotation, new GUIContent("Cancer Effect Rotation", "Adjust the rotation of the cancer effects separately from the rotation of the screen."));
             materialEditor.ShaderProperty(_CancerEffectOffset, new GUIContent("Cancer Effect Offset", "Adjust the movement of the cancer effects separately from the movement of the screen."));
@@ -961,6 +964,13 @@ public class StereoCancerGUI : ShaderGUI
         {
             EditorGUI.indentLevel = 1;
 
+            displayEmptySpace = EditorGUILayout.Foldout(displayEmptySpace, "Empty Space", true, scFoldoutStyle);
+
+            if (displayEmptySpace)
+            {
+                materialEditor.ShaderProperty(_EmptySpaceColor, new GUIContent("Color", "Adjust the color used to fill in empty space."));
+            }
+
             displaySignalNoise = EditorGUILayout.Foldout(displaySignalNoise, "Signal Noise", true, scFoldoutStyle);
 
             if (displaySignalNoise)
@@ -1016,9 +1026,9 @@ public class StereoCancerGUI : ShaderGUI
 
             if (displayEdgelordStriples)
             {
-                materialEditor.ShaderProperty(_EdgelordStripeColor, new GUIContent("Fog Function", "Adjust the color of the stripes."));
-                materialEditor.ShaderProperty(_EdgelordStripeSize, new GUIContent("Fog Color", "Adjust the size of the stripes."));
-                materialEditor.ShaderProperty(_EdgelordStripeOffset, new GUIContent("Fog Begin Distance", "Adjust the vertical offset of the stripes."));
+                materialEditor.ShaderProperty(_EdgelordStripeColor, new GUIContent("Stripe Color", "Adjust the color of the stripes."));
+                materialEditor.ShaderProperty(_EdgelordStripeSize, new GUIContent("Stripe Size", "Adjust the size of the stripes."));
+                materialEditor.ShaderProperty(_EdgelordStripeOffset, new GUIContent("Stripe Offset", "Adjust the vertical offset of the stripes."));
             }
 
             displayColorMask = EditorGUILayout.Foldout(displayColorMask, "Color Mask", true, scFoldoutStyle);

@@ -41,7 +41,7 @@
 		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
 		[Enum(Screen,0, Projected (Requires Directional Light),1)] _CoordinateSpace("Coordinate Space", Float) = 0
 		_CoordinateScale("Coordinate Scale", Float) = 1
-		[Enum(Wrap,0, Cutout,1, Clamp,2)] _WorldSamplingMode("World Sampling Mode", Float) = 0
+		[Enum(Wrap,0, Cutout,1, Clamp,2, Empty Space,3)] _WorldSamplingMode("World Sampling Mode", Float) = 0
 		_WorldSamplingRange("World Sampling Range", Range(0, 1)) = 1
 		_CancerEffectRotation("Cancer Effect Rotation", Float) = 0
 		_CancerEffectOffset("Cancer Effect Offset", Vector) = (0,0,0,0)
@@ -256,6 +256,8 @@
 		[Enum(Low, 0, High (Requires Directional Light), 1)] _NormalVectorDisplacementQuality("Normal Vector Displacement Quality", Float) = 1
 
 		// Screen color effects
+		_EmptySpaceColor("Empty Space Color", Color) = (0, 0, 0, 1)
+
 		_SignalNoiseSize("Signal Noise Size", Float) = 0
 		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
@@ -608,6 +610,8 @@
 			float _VoroniNoiseOffset;
 
 			// Screen color params
+			float4 _EmptySpaceColor;
+
 			float _FogType;
 			float4 _FogColor;
 			float _FogBegin;
@@ -1167,11 +1171,6 @@
 						i.worldPos.xyz += (displacementVector.xzy - 0.4980392)*displacementAmount;
 				}
 
-				// Distortion effects which take the inout variable clearPixel create empty space, 
-				// so we can return now if we aren't filling the empty space (Override mode 2).
-				if (clearPixel && _MemeTexOverrideMode != 2)
-					return half4(0, 0, 0, _CancerOpacity);
-
 				// Shift world pos back from its current axis-aligned position to
 				// the position it should be in-front of the camera.
 				float4 finishedWorldPos = i.worldPos;
@@ -1291,7 +1290,25 @@
 
 						stereoPosition = computeStereoUV(i.worldPos);
 					}
+					// Empty Space
+					else if (_WorldSamplingMode == 3)
+					{
+						float sampleLimit = _WorldSamplingRange * 100;
+						sampleLimit -= (abs(finishedWorldPos.z - 100) / 100)*sampleLimit;
+						sampleLimit = abs(sampleLimit);
+
+						if (finishedWorldPos.x < -sampleLimit || finishedWorldPos.x > sampleLimit
+							|| finishedWorldPos.y < -sampleLimit || finishedWorldPos.y > sampleLimit)
+						{
+							clearPixel = true;
+						}
+					}
 				}
+
+				// Distortion effects which take the inout variable clearPixel create empty space, 
+				// so we can return now if we aren't filling the empty space (Override mode 2).
+				if (clearPixel && _MemeTexOverrideMode != 2)
+					return half4(_EmptySpaceColor.rgb, _CancerOpacity);
 
 				// Undo the cancer effect offset and rotation for ONLY the screen sample coordinates
 				// This allows for moving effects around without affecting the screen.
@@ -1435,19 +1452,19 @@
 							// No override mode, blend image in.
 							if (_MemeTexOverrideMode == 0)
 							{
-								bgcolor.rgb = lerp(bgcolor.rgb, memeColor.rgb, _MemeTexOpacity);
+								bgcolor.rgb = lerp(bgcolor.rgb, memeColor.rgb, (_MemeTexOpacity*memeColor.a));
 							}
 							// Override Background
 							else if (_MemeTexOverrideMode == 1)
 							{
-								bgcolor = float4(memeColor.rgb * _MemeTexOpacity, 1);
+								bgcolor = float4(memeColor.rgb * (_MemeTexOpacity*memeColor.a), 1);
 							}
 							// Override Empty Space
 							else if (_MemeTexOverrideMode == 2)
 							{
 								if (clearPixel)
 								{
-									bgcolor = float4(memeColor.rgb * _MemeTexOpacity, 1);
+									bgcolor = float4(memeColor.rgb * (_MemeTexOpacity*memeColor.a), 1);
 									return bgcolor;
 								}
 							}
