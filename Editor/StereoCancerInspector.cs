@@ -72,6 +72,7 @@ public class StereoCancerGUI : ShaderGUI
     bool displayFog = false;
     bool displayEdgelordStriples = false;
     bool displayColorMask = false;
+    bool displayColorPalette = false;
     bool displayColorInversion = false;
     bool displayColorModifier = false;
     bool displayHSV = false;
@@ -86,9 +87,13 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CoordinateScale = null;
     MaterialProperty _WorldSamplingMode = null;
     MaterialProperty _WorldSamplingRange = null;
+    MaterialProperty _CancerEffectQuantization = null;
     MaterialProperty _CancerEffectRotation = null;
     MaterialProperty _CancerEffectOffset = null;
     MaterialProperty _Visibility = null;
+    MaterialProperty _FalloffEnabled = null;
+    MaterialProperty _FalloffFlags = null;
+    MaterialProperty _FalloffBeginPercentage = null;
 
     // Image Overlay params
     MaterialProperty _MemeTex = null;
@@ -319,6 +324,15 @@ public class StereoCancerGUI : ShaderGUI
 
     MaterialProperty _ColorMask = null;
 
+    MaterialProperty _PaletteOpacity = null;
+    MaterialProperty _PaletteScale = null;
+    MaterialProperty _PaletteOffset = null;
+    MaterialProperty _PalleteSource = null;
+    MaterialProperty _PaletteA = null;
+    MaterialProperty _PaletteB = null;
+    MaterialProperty _PaletteOscillation = null;
+    MaterialProperty _PalettePhase = null;
+
     MaterialProperty _ColorInversionR = null;
     MaterialProperty _ColorInversionG = null;
     MaterialProperty _ColorInversionB = null;
@@ -532,9 +546,20 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_CoordinateScale, new GUIContent("Coordinate Scale", "Adjust the scale of the screen-space cancer coordinates. Useful for adjusting 'Projected' coordinates and making final adjustments to animations."));
             materialEditor.ShaderProperty(_WorldSamplingMode, new GUIContent("World Sampling Mode", "Select how the screen texture is sampled when the coordinates exit the World Sampling Range."));
             materialEditor.ShaderProperty(_WorldSamplingRange, new GUIContent("World Sampling Range", "Adjust the cancer coordinate sampling range used for the currently selected 'World Sampling Mode'."));
+            materialEditor.ShaderProperty(_CancerEffectQuantization, new GUIContent("Cancer Effect Quantization", "Adjust the quantization of the cancer effects separately from the quantization of the screen."));
             materialEditor.ShaderProperty(_CancerEffectRotation, new GUIContent("Cancer Effect Rotation", "Adjust the rotation of the cancer effects separately from the rotation of the screen."));
             materialEditor.ShaderProperty(_CancerEffectOffset, new GUIContent("Cancer Effect Offset", "Adjust the movement of the cancer effects separately from the movement of the screen."));
             materialEditor.ShaderProperty(_Visibility, new GUIContent("Visibility", "Select which users should see the cancer effects. Settings other than 'Global' require that the object containing the StereoCancer material is parented to your avatar's head, and has a scale of 10,000 or greater."));
+
+            materialEditor.ShaderProperty(_FalloffEnabled, new GUIContent("Falloff Enabled", "Enable or disable falloff. Note: Falloff requires that all of the object scale axes are positive."));
+            if(_FalloffEnabled.floatValue != 0)
+            {
+                materialEditor.ShaderProperty(_FalloffFlags, new GUIContent("Falloff Flags", "Select if only opacity or distortion should falloff, or if both should be affected simultaneously."));
+                materialEditor.ShaderProperty(_FalloffBeginPercentage, new GUIContent("Falloff Begin Percentage", "The percentage of the object scale that the falloff begins at."));
+
+            }
+
+            GUILayout.Space(20);
             materialEditor.ShaderProperty(_ParticleSystem, new GUIContent("Particle System", "Select 'Yes' when the material is on a particle."));
 
             EditorGUI.indentLevel = 0;
@@ -1036,6 +1061,20 @@ public class StereoCancerGUI : ShaderGUI
             if (displayColorMask)
             {
                 materialEditor.ShaderProperty(_ColorMask, new GUIContent("Mask", "Apply a mask to the screen to remove unwanted colors. For example, a red mask will remove all green and blue colors."));
+            }
+
+            displayColorPalette = EditorGUILayout.Foldout(displayColorPalette, "Color Palettization", true, scFoldoutStyle);
+
+            if (displayColorPalette)
+            {
+                materialEditor.ShaderProperty(_PaletteOpacity, new GUIContent("Opacity", "Adjust how much of the color palette is blended into the screen color."));
+                materialEditor.ShaderProperty(_PaletteScale, new GUIContent("Scale", "Adjust the scale of the color palette in the world."));
+                materialEditor.ShaderProperty(_PaletteOffset, new GUIContent("Offset", "Adjust the offset of the color palette."));
+                materialEditor.ShaderProperty(_PalleteSource, new GUIContent("Control Source", "Select if the color palette should be automatically generated from the screen colors, or user specified."));
+                materialEditor.ShaderProperty(_PaletteA, new GUIContent("Palette Bias A", "Adjust the contast and brightness of the color palette."));
+                materialEditor.ShaderProperty(_PaletteB, new GUIContent("Palette Bias B", "Adjust the contast and brightness of the color palette."));
+                materialEditor.ShaderProperty(_PaletteOscillation, new GUIContent("Palette Oscillation", "Adjust how quickly the palette color changes. Integer values should be used in order for offset to smoothly loop through the palette."));
+                materialEditor.ShaderProperty(_PalettePhase, new GUIContent("Palette Phase", "Adjust how quickly the colors loop back around."));
             }
 
             displayColorInversion = EditorGUILayout.Foldout(displayColorInversion, "Color Inversion", true, scFoldoutStyle);

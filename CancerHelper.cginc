@@ -1,6 +1,14 @@
 #ifndef CANCER_HELPERS_CGINC
 #define CANCER_HELPERS_CGINC
 
+// iq is the man!
+// https://iquilezles.org/www/articles/palettes/palettes.htm
+// cosine based palette, 4 vec3 params
+float3 paletteColor(in float t, in float3 a, in float3 b, in float3 c, in float3 d)
+{
+	return a + b * cos(UNITY_TWO_PI*(c*t + d));
+}
+
 // http://www.neilmendoza.com/glsl-rotation-about-an-arbitrary-axis/
 // Comment by user 'blarg'
 float3x3 rotAxis(float3 axis, float a) 

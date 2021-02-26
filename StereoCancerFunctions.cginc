@@ -47,7 +47,7 @@ bool mirrorCheck(float cancerDisplayMode)
 	// Note: Does not contain the additional checks CancerSpace includes,
 	//		 such as Per-Eye exclusion, but is otherwise unmodified.
 	bool isMirror = unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0;
-	
+
 	// cancerDisplayMode == 0: Display on screen only
 	// cancerDisplayMode == 1: Display on mirror only
 	// cancerDisplayMode >= 2: Display on both mirror and screen.
@@ -95,7 +95,7 @@ float4 stereoEyeConvergence(float4 worldCoordinates, float3 axisUp, float conver
 
 float4 stereoEyeSeparation(float4 worldCoordinates, float3 axisRight, float separation)
 {
-	float offset = separation - 2* step(1, unity_StereoEyeIndex)*separation;
+	float offset = separation - 2 * step(1, unity_StereoEyeIndex)*separation;
 	worldCoordinates.xyz += axisRight * offset;
 
 	return worldCoordinates;
@@ -170,7 +170,7 @@ float4 wrapUVCoordinates(float4 stereoCoordinates)
 
 float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
 {
-	wrapValue = wrapValue*200;
+	wrapValue = wrapValue * 200;
 	float2 signs = sign(worldCoordinates.xy);
 
 	// Adjust wrap value based on the Z coordinate to constrain
@@ -223,7 +223,7 @@ float4 stereoMove(float4 worldPos, float3 camFront, float3 camRight, float angle
 	return worldPos;
 }
 
-float4 stereoShake(float4 worldPos, float shakeSpeed, float shakeXIntensity, float shakeXAmplitude, float shakeYIntensity, float shakeYAmplitude, 
+float4 stereoShake(float4 worldPos, float shakeSpeed, float shakeXIntensity, float shakeXAmplitude, float shakeYIntensity, float shakeYAmplitude,
 	float shakeZIntensity, float shakeZAmplitude)
 {
 	float shakeTime = _Time.y * shakeSpeed;
@@ -267,14 +267,15 @@ float4 stereoSplit(float4 worldPos, float3 axis, float splitPoint, float distanc
 
 float4 stereoBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
-	float dir = fmod(abs(flipPoint) + interval / 2 + offset, interval * 2) < interval ? -1 : 1;
+	float quantizedPoint = fmod(abs(flipPoint) + interval / 2 + offset, interval * 2);
+	float dir = quantizedPoint < interval ? -1 : 1;
 
 	worldPos.xyz += dir * moveAxis * distance;
 
 	return worldPos;
 }
 
-float4 stereoSinBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance) 
+float4 stereoSinBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
 	flipPoint = floor(flipPoint / interval);
 	float dir = sin(flipPoint + offset);
@@ -357,8 +358,8 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, distance, offset);
 		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, distance, offset);
 
-		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, -distance*4, -offset);
-		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, -distance*4, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, -distance * 4, -offset);
+		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, -distance * 4, -offset);
 	}
 
 	return worldCoordinates / 10;
@@ -367,7 +368,7 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 float4 stereoCheckerboard(float4 coordinates, float3 axis, float angle, float scale, float shiftDistance)
 {
 	float4 localCoordinates = coordinates;
-	
+
 	UNITY_BRANCH
 	if (angle != 0)
 		localCoordinates = stereoRotate(localCoordinates, axis, angle);
@@ -401,7 +402,7 @@ float4 stereoRingRotation(float4 worldCoordinates, float innerAngle, float outer
 	// If the user only changes ringWidth and not radius then their screen will be
 	// flipped upside-down.
 	float3 toWorldVector = normalize(worldCoordinates);
-	float AngleToFront = acos(dot(toWorldVector, float3(0,0,-1)));
+	float AngleToFront = acos(dot(toWorldVector, float3(0, 0, -1)));
 
 	UNITY_BRANCH
 	if (fmod(abs(AngleToFront), ringRadius - ringWidth) > ringRadius)
@@ -418,7 +419,7 @@ float4 stereoSpiral(float4 worldCoordinates, float intensity)
 	float dist = length(worldVector);
 	worldVector = normalize(worldVector);
 
-	float angleToWorldVector = acos(dot(worldVector, float3(0,0,-1)));
+	float angleToWorldVector = acos(dot(worldVector, float3(0, 0, -1)));
 
 	worldCoordinates.xy = rotate2D(worldCoordinates.xy, dist*angleToWorldVector*intensity);
 
@@ -455,7 +456,7 @@ float4 stereoFishEye(float4 worldCoordinates, float3 camFront, float intensity)
 
 	float angleToWorldVector = acos(dot(worldVector, camFront));
 
-	worldCoordinates.xyz += camFront *(abs(angleToWorldVector) / UNITY_PI) * intensity;
+	worldCoordinates.xyz += camFront * (abs(angleToWorldVector) / UNITY_PI) * intensity;
 
 	return worldCoordinates;
 }
@@ -489,7 +490,7 @@ float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float widt
 
 	UNITY_BRANCH
 	if (abs(worldCoordinates.x) <= width)
-		worldCoordinates.xyz += axis*distance;
+		worldCoordinates.xyz += axis * distance;
 
 	worldCoordinates.x -= offset;
 	worldCoordinates.xy = rotate2D(worldCoordinates.xy, angle);
@@ -582,10 +583,10 @@ float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, f
 	{
 		// minX, maxX, minY, maxY
 		float4 boundingBox;
-		
+
 		boundingBox.y = gold_noise(seed + 2, seed + 3) * spawnRangeX - halfSpawnRangeX;
 		boundingBox.x = boundingBox.y - (minGlitchWidth + gold_noise(seed, seed + 1) * distWidth);
-		
+
 		boundingBox.w = gold_noise(seed + 6, seed + 7) * spawnRangeY - halfSpawnRangeY;
 		boundingBox.z = boundingBox.w - (minGlitchHeight + gold_noise(seed + 4, seed + 5) * distHeight);
 
@@ -613,7 +614,7 @@ float4 stereoKaleidoscope(float4 worldCoordinates, float angle, float segments)
 	// partial segment (if any) without executing a conditional
 	// every loop.
 	int i = 0;
-	
+
 	for (; i < segments; i++)
 	{
 		worldCoordinates.x = abs(worldCoordinates.x);
@@ -741,7 +742,7 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		float4 upPos = centerPos;
 		float4 downPos = centerPos;
 
-		leftPos.xy = centerPos.xy + float2(-1,0)*texelSize.xy;
+		leftPos.xy = centerPos.xy + float2(-1, 0)*texelSize.xy;
 		rightPos.xy = centerPos.xy + float2(1, 0)*texelSize.xy;
 		upPos.xy = centerPos.xy + float2(0, 1)*texelSize.xy;
 		downPos.xy = centerPos.xy + float2(0, -1)*texelSize.xy;
@@ -778,7 +779,7 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		float rightDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, rightUV);
 		float upDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, upUV);
 		float downDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, downUV);
-		
+
 		float4x4 invProj = inverse(UNITY_MATRIX_P);
 
 		centerDepth = length(viewPosFromDepth(invProj, centerUV.xy / centerUV.w, centerDepth / centerUV.w));
@@ -844,7 +845,7 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 
 		float3 toWorldPosDir = normalize(worldCoordinates.xyz - cameraPosition);
 		float3 depthWorldPos = cameraPosition + toWorldPosDir * depth;
-		
+
 		// View Space
 		UNITY_BRANCH
 		if (coordinateSpace == 0)
@@ -882,7 +883,7 @@ float2 calculateUVFromAxisCoordinates(float4 axisCoordinates, float4 texture_ST,
 }
 
 float4 stereoImageOverlay(float4 axisCoordinates, float4 startingAxisAlignedPos,
-	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize, 
+	sampler2D memeImage, float4 memeImage_ST, float4 memeImage_TexelSize,
 	int memeColumns, int memeRows, int memeCount, int memeIndex,
 	float clampUV, float cutoutUV, inout bool dropMemePixels)
 {
@@ -897,7 +898,7 @@ float4 stereoImageOverlay(float4 axisCoordinates, float4 startingAxisAlignedPos,
 		memeImage_TexelSize.zw *= imageSizeScaler;
 
 		float2 pxCoordinates = uv * memeImage_TexelSize.zw;
-		if (pxCoordinates.x > memeImage_TexelSize.z-1 || pxCoordinates.x < 1 || pxCoordinates.y > memeImage_TexelSize.w-1 || pxCoordinates.y < 1)
+		if (pxCoordinates.x > memeImage_TexelSize.z - 1 || pxCoordinates.x < 0 || pxCoordinates.y > memeImage_TexelSize.w - 1 || pxCoordinates.y < 0)
 			dropMemePixels = true;
 	}
 	if (clampUV)
@@ -915,7 +916,7 @@ float4 stereoImageOverlay(float4 axisCoordinates, float4 startingAxisAlignedPos,
 		float2 imageStartingOffset = float2(memeIndex % memeColumns, 0);
 		imageStartingOffset.y = (memeRows - 1) - (memeIndex - (memeIndex % memeColumns)) / memeColumns;
 
-		uv = imageStartingOffset*imageSizeScaler + imageSizeScaler*uv;
+		uv = imageStartingOffset * imageSizeScaler + imageSizeScaler * uv;
 		ddScaler *= imageSizeScaler;
 	}
 
@@ -936,7 +937,7 @@ half3 fog(float3 bgcolor, float3 worldPosition, float fogMode, float4 fogColor, 
 		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(fogAlpha, 0, 1));
 	// Squared
 	else if (fogMode == 2)
-		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(fogAlpha*(fogAlpha+1), 0, 1));
+		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(fogAlpha*(fogAlpha + 1), 0, 1));
 	// Log2
 	else if (fogMode == 3)
 		bgcolor.rgb = lerp(bgcolor.rgb, bgcolor.rgb*fogColor, clamp(log2(1 + fogAlpha), 0, 1));
@@ -965,8 +966,8 @@ half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates,
 {
 	float3 color = float3(0, 0, 0);
 
-	float startingAdjustment = clamp(targetPoint - pointAdjustmentStrength, -extrapolation, 1.0+extrapolation);
-	float endingAdjustment = clamp(targetPoint + pointAdjustmentStrength, -extrapolation, 1.0+extrapolation);
+	float startingAdjustment = clamp(targetPoint - pointAdjustmentStrength, -extrapolation, 1.0 + extrapolation);
+	float endingAdjustment = clamp(targetPoint + pointAdjustmentStrength, -extrapolation, 1.0 + extrapolation);
 
 	float4 startingPoint = lerp(startingWorldCoordinates, finalWorldCoordinates, startingAdjustment);
 	float4 endingPoint = lerp(startingWorldCoordinates, finalWorldCoordinates, endingAdjustment);
@@ -993,7 +994,7 @@ half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates,
 	UNITY_LOOP
 	for (int q = 0; q < sampleCount; q++)
 	{
-		float4 samplePos = float4(startingPoint.xyz + blurMovementVec*q, startingPoint.w);
+		float4 samplePos = float4(startingPoint.xyz + blurMovementVec * q, startingPoint.w);
 		float attenuation = 1.0 - distance(targetPosition.xyz, samplePos.xyz) / totalMovementDistance;
 
 		color.rgb += tex2Dproj(backgroundTexture, computeStereoUV(samplePos)).rgb*attenuation;
@@ -1027,8 +1028,8 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 	// Flat
 	else
 	{
-		greenAbberationPos.xyz += camFront * (separation) * strength;
-		blueAbberationPos.xyz += camFront * (separation*2) * strength;
+		greenAbberationPos.xyz += camFront * (separation)* strength;
+		blueAbberationPos.xyz += camFront * (separation * 2) * strength;
 	}
 
 	redAbberationPos = computeStereoUV(redAbberationPos);
@@ -1043,7 +1044,7 @@ half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sa
 	float offsetX, float offsetY, float offsetZ, float coordinateSource, float scale, float sharpness, float uvRange, bool sampleScreen)
 {
 	float3 samplePosition = worldPosFromDepth(depthMap, depthSamplePos, camPos, worldCoordinates);
-	
+
 	// World Normal or View Normal
 	if (coordinateSource != 0)
 		samplePosition.xyz = mul(rotAxis(normal, UNITY_HALF_PI), samplePosition.xyz);
@@ -1086,7 +1087,7 @@ half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sa
 	half3 colorY = tex2D(triplanarMap, frac(samplePosition.xz)*uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.z));
 	half3 colorZ = tex2D(triplanarMap, frac(samplePosition.xy)*uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.y));
 
-	return colorX*blendWeights.x + colorY*blendWeights.y + colorZ*blendWeights.z;
+	return colorX * blendWeights.x + colorY * blendWeights.y + colorZ * blendWeights.z;
 }
 
 
@@ -1196,7 +1197,7 @@ half3 colorModifier(half3 bgcolor, float mode, float strength, float blend)
 	{
 		modifiedColor.rgb = bgcolor.rgb;
 
-		float quantization = length(modifiedColor.rgb) * (1.0 - strength*0.01);
+		float quantization = length(modifiedColor.rgb) * (1.0 - strength * 0.01);
 		modifiedColor.rgb = lerp(bgcolor.rgb, floor(modifiedColor.rgb * quantization) / quantization, strength * 0.1);
 	}
 
@@ -1217,14 +1218,14 @@ half3 imaginaryColors(float3 worldVector, float angle)
 {
 #ifdef UNITY_SINGLE_PASS_STEREO
 	// Flip the color wheel for the other eye to generate 'imaginary' colors
-	angle += (UNITY_HALF_PI) * step(1, unity_StereoEyeIndex);
+	angle += (UNITY_HALF_PI)* step(1, unity_StereoEyeIndex);
 #endif
 
 	worldVector.xy = rotate2D(worldVector.xy, -angle);
 
 	// Don't worry about it :>)
 	worldVector.xyz *= worldVector.zxy;
-	worldVector *= 1.0/rcp(worldVector);
+	worldVector *= 1.0 / rcp(worldVector);
 
 	return worldVector.xyz;
 }
@@ -1263,7 +1264,7 @@ float3 sampleSobel(sampler2D textureHandle, float3 camRight, float3 camUp, float
 			}
 		}
 
-	return -sqrt(Gx*Gx + Gy*Gy);
+	return -sqrt(Gx*Gx + Gy * Gy);
 }
 
 float sobelFilter(sampler2D textureHandle, float3 camRight, float3 camUp, float4 worldCoordinates, float searchDistance, float quality)
@@ -1299,6 +1300,19 @@ float sobelFilter(sampler2D textureHandle, float3 camRight, float3 camUp, float4
 	}
 
 	return -max(sobelMag.r, max(sobelMag.g, sobelMag.b));
+}
+
+half3 palletization(float3 worldPosition, half4 bgcolor, bool colorSource, float paletteScale, float paletteOffset, float4 a, float4 b, float4 c, float4 d)
+{
+	worldPosition *= paletteScale;
+
+	// Screen color control
+	if (colorSource == 0)
+		bgcolor.rgb *= paletteColor(length(paletteOffset + sin(worldPosition)), bgcolor.brg*bgcolor.brg, bgcolor.brg*bgcolor.brg, bgcolor.brg, bgcolor.rgb);
+	else
+		bgcolor.rgb *= paletteColor(length(paletteOffset + sin(worldPosition.xyz)), a.rgb, b.rgb, c.rgb, d.rgb);
+
+	return bgcolor;
 }
 
 #endif

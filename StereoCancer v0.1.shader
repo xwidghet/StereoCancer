@@ -43,9 +43,13 @@
 		_CoordinateScale("Coordinate Scale", Float) = 1
 		[Enum(Wrap,0, Cutout,1, Clamp,2, Empty Space,3)] _WorldSamplingMode("World Sampling Mode", Float) = 0
 		_WorldSamplingRange("World Sampling Range", Range(0, 1)) = 1
+		_CancerEffectQuantization("Cancer Effect Quantization", Range(0, 1)) = 0
 		_CancerEffectRotation("Cancer Effect Rotation", Float) = 0
 		_CancerEffectOffset("Cancer Effect Offset", Vector) = (0,0,0,0)
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
+		[Enum(No,0, Yes,1)] _FalloffEnabled("Falloff Enabled", Float) = 0
+		[Enum(OpacityOnly,1, DistortionOnly,2, OpacityAndDistortion,3)] _FalloffFlags("Falloff Flags", Int) = 3
+		_FalloffBeginPercentage("Falloff Begin Percentage", Range(0,1)) = 0.75
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
 
@@ -290,6 +294,15 @@
 
 		_ColorMask("Color Mask", Color) = (1, 1, 1, 1)
 
+		_PaletteOpacity("Palette Opacity", Float) = 0
+		_PaletteScale("Palette Scale", Float) = 1
+		_PaletteOffset("Palette Offset", Float) = 0
+		[Enum(Screen Color,0, User Specified,1)] _PalleteSource("Palette Source", Float) = 1
+		_PaletteA("Palette Bias A", Vector) = (0, 0.5, 0.75, 0)
+		_PaletteB("Palette Bias B", Vector) = (0.55, 0.11, 0.33, 0)
+		_PaletteOscillation("Palette Oscillation", Vector) = (1, 2, 3, 0)
+		_PalettePhase("Palette Phase", Vector) = (0.88, 0.43, 0.92, 0)
+
 		_ColorInversionR("Color Inversion R", Float) = 0
 		_ColorInversionG("Color Inversion G", Float) = 0
 		_ColorInversionB("Color Inversion B", Float) = 0
@@ -392,9 +405,13 @@
 			float _CoordinateScale;
 			float _WorldSamplingMode;
 			float _WorldSamplingRange;
+			float _CancerEffectQuantization;
 			float _CancerEffectRotation;
 			float4 _CancerEffectOffset;
 			float _Visibility;
+			float _FalloffEnabled;
+			int _FalloffFlags;
+			float _FalloffBeginPercentage;
 			
 			// Image Overlay params
 			sampler2D _MemeTex;
@@ -623,6 +640,15 @@
 
 			float4 _ColorMask;
 
+			float _PaletteOpacity;
+			float _PaletteScale;
+			float _PaletteOffset;
+			float _PalleteSource;
+			float4 _PaletteA;
+			float4 _PaletteB;
+			float4 _PaletteOscillation;
+			float4 _PalettePhase;
+
 			float _ColorInversionR;
 			float _ColorInversionG;
 			float _ColorInversionB;
@@ -702,11 +728,15 @@
 				nointerpolation float3 camPos : TEXCOORD5;
 				nointerpolation float3x3 viewMatRot : TEXCOORD6;
 				nointerpolation float3x3 inverseViewMatRot : TEXCOORD9;
+				nointerpolation float2 colorDistortionFalloff : TEXCOORD12;
 			};
 
 			v2f vert (appdata v)
 			{
 				v2f o;
+
+				o.viewMatRot = extract_rotation_matrix(UNITY_MATRIX_V);
+				o.inverseViewMatRot = transpose(o.viewMatRot);
 
 				// I could normalize the direction vectors, or I could just live dangerously
 				// with reckless abandon to save insignificant amounts of performance.
@@ -714,12 +744,9 @@
 				// Note: This does not utilize cross products to avoid the issue where
 				//		 at certain rotations the Up and Right vectors will flip.
 				//		 (Roll of +-30 degrees and +-90 degrees).
-				o.camFront = mul((float3x3)unity_CameraToWorld, float3(0, 0, 1));
-				o.camUp = mul((float3x3)unity_CameraToWorld, float3(0, 1, 0));
-				o.camRight = mul((float3x3)unity_CameraToWorld, float3(1, 0, 0));
-
-				o.viewMatRot = extract_rotation_matrix(UNITY_MATRIX_V);
-				o.inverseViewMatRot = transpose(o.viewMatRot);
+				o.camFront = mul((float3x3)o.inverseViewMatRot, float3(0, 0, 1));
+				o.camUp = mul((float3x3)o.inverseViewMatRot, float3(0, 1, 0));
+				o.camRight = mul((float3x3)o.inverseViewMatRot, float3(1, 0, 0));
 
 				// The particle knows where it is, and where it isn't.
 				// It subtracts where it is, from where it isn't,
@@ -761,6 +788,7 @@
 
 				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
 				o.camPos = float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+
 				o.worldPos.xyz += o.camPos;
 
 				o.pos = mul(UNITY_MATRIX_VP, o.worldPos);
@@ -770,7 +798,6 @@
 				// This makes it easy to write effects as the coordinates
 				// are all on a 2D XY plane, 100 units away from the camera.
 				o.worldPos.xyz = v.vertex.xyz;
-				
 
 				// If visiblity isn't global...
 				if (_Visibility > 0)
@@ -781,7 +808,8 @@
 
 					// If the Y scale hasn't been multiplied by 0.0001 then it is not the user of the avatar
 					// (or their viewball has drifted far away from their head).
-					bool isOther = length(float3(UNITY_MATRIX_M[1][0], UNITY_MATRIX_M[1][1], UNITY_MATRIX_M[1][2])) >= 10;
+					float objectScale = length(float3(UNITY_MATRIX_M[1][0], UNITY_MATRIX_M[1][1], UNITY_MATRIX_M[1][2]));
+					bool isOther = objectScale >= 10;
 					
 					// Self Only
 					if (_Visibility == 1 && (isOther == true))
@@ -789,6 +817,37 @@
 					// Others Only...I'm so sorry.
 					else if (_Visibility == 2 && (isOther == false))
 						o.pos = float4(9999, 9999, 9999, 9999);
+				}
+
+				o.colorDistortionFalloff = float2(1, 1);
+				// When enabled, evicts the vertex to outer-space when the camera is outside of the cube
+				if (_FalloffEnabled != 0)
+				{
+					// For VR we want to use a consistent camera position so that the eyes get the same amount
+					// of opacity and distortion reduction.
+#if defined(USING_STEREO_MATRICES)
+					float3 centerCamPos = lerp(
+						float3(unity_StereoCameraToWorld[0][0][3], unity_StereoCameraToWorld[0][1][3], unity_StereoCameraToWorld[0][2][3]),
+						float3(unity_StereoCameraToWorld[1][0][3], unity_StereoCameraToWorld[1][1][3], unity_StereoCameraToWorld[1][2][3]),
+						0.5);
+#else
+					float3 centerCamPos = o.camPos;
+#endif
+
+					// Handle non-uniform scaling and rotation in one easy step!
+					float3 objSpaceCamPos = abs(mul(unity_WorldToObject, float4(centerCamPos, 1)).xyz);
+					if (any(objSpaceCamPos > 0.5))
+					{
+						o.pos = float4(9999, 9999, 9999, 9999);
+					}
+					else
+					{
+						float falloffAlpha = max(max(objSpaceCamPos.x, objSpaceCamPos.y), objSpaceCamPos.z);
+						float falloffMin = (0.5*_FalloffBeginPercentage);
+
+						falloffAlpha = smoothstep(falloffMin, 0.5, falloffAlpha);
+						o.colorDistortionFalloff.xy -= float2(falloffAlpha*((_FalloffFlags & 1) != 0), falloffAlpha*((_FalloffFlags & 2) != 0));
+					}
 				}
 
 				// Evicts the vertex to outer-space when visibility doesn't match the display mode.
@@ -815,6 +874,17 @@
 				// Allow for easily changing effect intensities without having to modify
 				// an entire animation. Also very useful for adjusting projected coordinates.
 				i.worldPos.xyz *= _CoordinateScale;
+
+				// Quantize the distortion effects separately from the screen
+				float3 cancerEffectQuantizationVector = float3(0, 0, 0);
+				UNITY_BRANCH
+				if (_CancerEffectQuantization != 0)
+				{
+					cancerEffectQuantizationVector = i.worldPos.xyz;
+					i.worldPos = stereoQuantization(i.worldPos, 10.0 - _CancerEffectQuantization * 10.0);
+
+					cancerEffectQuantizationVector = i.worldPos.xyz - cancerEffectQuantizationVector;
+				}
 
 				// Rotate the effects separately from the screen
 				UNITY_BRANCH
@@ -1310,21 +1380,42 @@
 				if (clearPixel && _MemeTexOverrideMode != 2)
 					return half4(_EmptySpaceColor.rgb, _CancerOpacity);
 
-				// Undo the cancer effect offset and rotation for ONLY the screen sample coordinates
+				// Apply falloff to distortion
+				if (i.colorDistortionFalloff.y < 1)
+				{
+					finishedWorldPos.xyz = lerp(startingAxisAlignedPos.xyz, finishedWorldPos.xyz, i.colorDistortionFalloff.y);
+
+					i.worldPos = lerp(startingWorldPos, i.worldPos, i.colorDistortionFalloff.y);
+					stereoPosition = computeStereoUV(i.worldPos);
+				}
+
+				// Undo the cancer effect offset, rotation, and quantization for ONLY the screen sample coordinates
 				// This allows for moving effects around without affecting the screen.
 				// Ex. Meme spotlight movement via Vignette 
+				float4 originalFinishedWorldPos = finishedWorldPos;
 				UNITY_BRANCH
 				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0)
 				{
-					float4 temp = finishedWorldPos;
-					temp.xyz -= _CancerEffectOffset.xyz;
-					temp.xy = rotate2D(temp.xy, -_CancerEffectRotation);
+					finishedWorldPos.xyz -= _CancerEffectOffset.xyz;
+					finishedWorldPos.xy = rotate2D(finishedWorldPos.xy, -_CancerEffectRotation);
 
-					temp.xyz = mul(i.inverseViewMatRot, temp.xyz);
+					float4 temp = float4(mul(i.inverseViewMatRot, finishedWorldPos.xyz), 1);
 					temp.xyz += i.camPos;
 					stereoPosition = computeStereoUV(temp);
 				}
-				
+
+				UNITY_BRANCH
+				if (_CancerEffectQuantization != 0)
+				{
+					finishedWorldPos.xyz -= cancerEffectQuantizationVector;
+
+					float4 temp = float4(mul(i.inverseViewMatRot, finishedWorldPos.xyz), 1);
+					temp.xyz += i.camPos;
+					stereoPosition = computeStereoUV(temp);
+				}
+
+				finishedWorldPos = originalFinishedWorldPos;
+
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
 				// each eye.
@@ -1362,6 +1453,15 @@
 					bgcolor.rgb += 0.00000001;
 
 					bgcolor *= _ColorMask;
+				}
+
+				UNITY_BRANCH
+				if (_PaletteOpacity != 0)
+				{
+					float3 palleteWorldPos = worldPosFromDepth(_CameraDepthTexture, computeStereoUV(i.worldPos), i.camPos, i.worldPos);
+					half3 paletteColor = palletization(palleteWorldPos, bgcolor, _PalleteSource, _PaletteScale, _PaletteOffset, _PaletteA, _PaletteB, _PaletteOscillation, _PalettePhase);
+					
+					bgcolor.rgb = lerp(bgcolor.rgb, paletteColor, _PaletteOpacity);
 				}
 
 				float3 inversionParameters = float3(_ColorInversionR, _ColorInversionG, _ColorInversionB);
@@ -1567,7 +1667,9 @@
 				//
 				//				_BarXDistance = 10.00
 				//				_BarXInterval = 18.00
-				bgcolor.a = _CancerOpacity;
+
+				// Apply falloff to color
+				bgcolor.a = _CancerOpacity*i.colorDistortionFalloff.x;
 
 				// I'm sorry fellow VRChat players, but you've just contracted eye-cancer.
 				//	-xwidghet
