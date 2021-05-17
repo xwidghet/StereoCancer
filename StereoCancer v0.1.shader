@@ -1,4 +1,6 @@
-﻿Shader "xwidghet/StereoCancer v0.1"
+﻿// UNITY_SHADER_NO_UPGRADE
+
+Shader "xwidghet/StereoCancer v0.1"
 {
 	// A collection of effects made by xwidghet to allow for creating dynamic stereo-correct shader animations
 	// which can be combined together without creating massive performance issues.
@@ -14,9 +16,7 @@
 	//
 	// ex. Geometric Dither is created by using Skew repeatedly with varying parameter values
 	//
-	// LICENSE: This shader is licensed under GPL V3 as it makes usage of
-	//			CancerSpace's mirror check which inherently means this must be
-	//			licensed under the same GPL V3 license.
+	// LICENSE: This shader is licensed under GPL V3.
 	//			https://www.gnu.org/licenses/gpl-3.0.en.html
 	//
 	//			This shader makes use of the perlin noise generator from https://github.com/keijiro/NoiseShader
@@ -37,21 +37,41 @@
 	Properties
 	{
 		// Rendering Parameters
+		[Enum(UnityEngine.Rendering.CullMode)] _CullMode("Cull Mode", Float) = 1
+		[Enum(Off, 0, On, 1)] _ZWrite("Z Write", Int) = 0
+		[Enum(UnityEngine.Rendering.CompareFunction)] _ZTest("Z Test", Int) = 8
+
 		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
-		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 0
-		[Enum(Screen,0, Projected (Requires Directional Light),1)] _CoordinateSpace("Coordinate Space", Float) = 0
+		[Enum(Fullscreen,0, World Scale,1)] _ObjectDisplayMode("Object Display Mode", Float) = 0
+		[Enum(No, 0, Yes,1)] _DisplayOnSurface("Display On Surface", Float) = 0
+		[Enum(Clamp,0, Eye Clamp,1, Wrap,2)] _ScreenSamplingMode("Screen Sampling Mode", Float) = 1
+		[Enum(Screen,0, Projected (Requires Directional Light),1, Centered On Object,2)] _CoordinateSpace("Coordinate Space", Float) = 0
 		_CoordinateScale("Coordinate Scale", Float) = 1
 		[Enum(Wrap,0, Cutout,1, Clamp,2, Empty Space,3)] _WorldSamplingMode("World Sampling Mode", Float) = 0
 		_WorldSamplingRange("World Sampling Range", Range(0, 1)) = 1
 		_CancerEffectQuantization("Cancer Effect Quantization", Range(0, 1)) = 0
 		_CancerEffectRotation("Cancer Effect Rotation", Float) = 0
 		_CancerEffectOffset("Cancer Effect Offset", Vector) = (0,0,0,0)
+		_CancerEffectRange("Cancer Effect Range", Range(0, 1)) = 1
+		[Enum(No,0, Yes,1)] _RemoveCameraRoll("Remove Camera Roll", Int) = 0
 		[Enum(Global,0, SelfOnly,1, OthersOnly,2)] _Visibility("Visibility", Float) = 0
-		[Enum(No,0, Yes,1)] _FalloffEnabled("Falloff Enabled", Float) = 0
+		[Enum(No,0, Yes,1)] _FalloffEnabled("Falloff Enabled", Int) = 0
 		[Enum(OpacityOnly,1, DistortionOnly,2, OpacityAndDistortion,3)] _FalloffFlags("Falloff Flags", Int) = 3
-		_FalloffBeginPercentage("Falloff Begin Percentage", Range(0,1)) = 0.75
+		_FalloffBeginPercentage("Falloff Begin Percentage", Range(0,100)) = 0.75
+		_FalloffEndPercentage("Falloff End Percentage", Range(0,100)) = 1.0
+		_FalloffAngleBegin("Falloff Angle Begin", Range(0,1)) = 0.1
+		_FalloffAngleEnd("Falloff Angle End", Range(0,1)) = 0.2
 
 		[Enum(No,0, Yes,1)] _ParticleSystem("Particle System", Int) = 0
+
+		// Stencil Parameters
+		_StencilRef("Stencil Ref", Int) = 0
+		[Enum(UnityEngine.Rendering.CompareFunction)] _StencilComp("Stencil Comparison", Int) = 0
+		[Enum(UnityEngine.Rendering.StencilOp)] _StencilOp("Stencil Operation", Int) = 0
+		[Enum(UnityEngine.Rendering.StencilOp)] _StencilFail("Stencil Fail", Int) = 0
+		[Enum(UnityEngine.Rendering.StencilOp)] _StencilZFail("Stencil ZFail", Int) = 0
+		_ReadMask("ReadMask", Int) = 255
+		_WriteMask("WriteMask", Int) = 255
 
 		// Blending Parameters
 		[Enum(UnityEngine.Rendering.BlendMode)] _SrcFactor("SrcFactor", Float) = 5
@@ -74,6 +94,21 @@
 		[Enum(No,0, Yes,1)] _MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
+		[Enum(No,0, Yes,1)] _MemeImageScaleWithDistance("Meme Image Scale With Distance", Int) = 0
+
+		// Mask Map
+		_MaskMap("Mask Map (R)", 2D) = "white" {}
+		_MaskMapColumns("Mask Map Columns", Int) = 1
+		_MaskMapRows("Mask Map Rows", Int) = 1
+		_MaskMapCount("Mask Map Count", Int) = 1
+		_MaskMapIndex("Mask Map Index", Int) = 0
+		_MaskMapAngle("Mask Map Angle", Float) = 0
+		_MaskMapOpacity("Mask Map Opacity", Float) = 0
+		[Enum(No,0, Yes,1)] _MaskMapClamp("Mask Map Clamp", Int) = 0
+		[Enum(No,0, Yes,1)] _MaskMapCutOut("Mask Map Cut Out", Int) = 0
+		[Enum(OpacityOnly,1, DistortionOnly,2, OpacityAndDistortion,3)] _MaskFlags("Mask Flags", Int) = 3
+		[Enum(No,0, Yes,1)] _MaskMapScaleWithDistance("Mask Map Scale With Distance", Int) = 0
+		[Enum(No,0, Yes,1)] _MaskSampleDistortedCoordinates("Mask Map Sample Distortion", Int) = 0
 
 		// Displacement Map Map Displacement \\/
 		_DisplacementMap("Displacement Map (RGB)", 2D) = "white" {}
@@ -86,6 +121,7 @@
 		_DisplacementMapIntensity("Displacement Map Intensity", Float) = 0
 		[Enum(No,0, Yes,1)] _DisplacementMapClamp("Displacement Map Clamp", Int) = 0
 		[Enum(No,0, Yes,1)] _DisplacementMapCutOut("Displacement Map Cut Out", Int) = 0
+		[Enum(No,0, Yes,1)] _DisplacementMapScaleWithDistance("Displacement Map Scale With Distance", Int) = 0
 
 		// Triplanar Map
 		_TriplanarMap("Triplanar Map (RGB)", 2D) = "white" {}
@@ -130,72 +166,72 @@
 
 		_SkewXAngle("Skew X Angle", Float) = 0
 		_SkewXDistance("Skew X Distance", Float) = 0
-		_SkewXInterval("Skew X Interval", Float) = 0
+		_SkewXInterval("Skew X Interval", Float) = 1
 		_SkewXOffset("Skew X Offset", Float) = 0
 
 		_SkewYAngle("Skew Y Angle", Float) = 0
 		_SkewYDistance("Skew Y Distance", Float) = 0
-		_SkewYInterval("Skew Y Interval", Float) = 0
+		_SkewYInterval("Skew Y Interval", Float) = 1
 		_SkewYOffset("Skew Y Offset", Float) = 0
 
 		_BarXAngle("Bar X Angle", Float) = 0
 		_BarXDistance("Bar X Distance", Float) = 0
-		_BarXInterval("Bar X Interval", Float) = 0
+		_BarXInterval("Bar X Interval", Float) = 1
 		_BarXOffset("Bar X Offset", Float) = 0
 		
 		_BarYAngle("Bar Y Angle", Float) = 0
 		_BarYDistance("Bar Y Distance", Float) = 0
-		_BarYInterval("Bar Y Interval", Float) = 0
+		_BarYInterval("Bar Y Interval", Float) = 1
 		_BarYOffset("Bar Y Offset", Float) = 0
 
 		_SinBarXAngle("Sin Bar X Angle", Float) = 0
 		_SinBarXDistance("Sin Bar X Distance", Float) = 0
-		_SinBarXInterval("Sin Bar X Interval", Float) = 0
+		_SinBarXInterval("Sin Bar X Interval", Float) = 1
 		_SinBarXOffset("Sin Bar X Offset", Float) = 0
 
 		_SinBarYAngle("Sin Bar Y Angle", Float) = 0
 		_SinBarYDistance("Sin Bar Y Distance", Float) = 0
-		_SinBarYInterval("Sin Bar Y Interval", Float) = 0
+		_SinBarYInterval("Sin Bar Y Interval", Float) = 1
 		_SinBarYOffset("Sin Bar Y Offset", Float) = 0
 
 		_ZigZagXAngle("ZigZag X Angle", Float) = 0
-		_ZigZagXDensity("ZigZag X Density", Float) = 0
+		_ZigZagXDensity("ZigZag X Density", Float) = 10
 		_ZigZagXAmplitude("ZigZag X Amplitude", Float) = 0
 		_ZigZagXOffset("ZigZag X Offset", Float) = 0
 
 		_ZigZagYAngle("ZigZag Y Angle", Float) = 0
-		_ZigZagYDensity("ZigZag Y Density", Float) = 0
+		_ZigZagYDensity("ZigZag Y Density", Float) = 10
 		_ZigZagYAmplitude("ZigZag Y Amplitude", Float) = 0
 		_ZigZagYOffset("ZigZag Y Offset", Float) = 0
 
 		_SinWaveAngle("Sin Wave Angle", Float) = 0
-		_SinWaveDensity("Sin Wave Density", Float) = 0
+		_SinWaveDensity("Sin Wave Density", Float) = 10
 		_SinWaveAmplitude("Sin Wave Amplitude", Float) = 0
 		_SinWaveOffset("Sin Wave Offset", Float) = 0
 
 		_CosWaveAngle("Cos Wave Angle", Float) = 0
-		_CosWaveDensity("Cos Wave Density", Float) = 0
+		_CosWaveDensity("Cos Wave Density", Float) = 10
 		_CosWaveAmplitude("Cos Wave Amplitude", Float) = 0
 		_CosWaveOffset("Cos Wave Offset", Float) = 0
 
 		_TanWaveAngle("Tan Wave Angle", Float) = 0
-		_TanWaveDensity("Tan Wave Density", Float) = 0
+		_TanWaveDensity("Tan Wave Density", Float) = 10
 		_TanWaveAmplitude("Tan Wave Amplitude", Float) = 0
 		_TanWaveOffset("Tan Wave Offset", Float) = 0
 
 		_SliceAngle("Slice Angle", Float) = 0
-		_SliceWidth("Slice Width", Float) = 0
+		_SliceWidth("Slice Width", Float) = 10
 		_SliceDistance("Slice Distance", Float) = 0
 		_SliceOffset("Slice Offset", Float) = 0
 
-		_RippleDensity("Ripple Density", Float) = 0
+		_RippleDensity("Ripple Density", Float) = 50
 		_RippleAmplitude("Ripple Amplitude", Float) = 0
 		_RippleOffset("Ripple Offset", Float) = 0
 		_RippleInnerFalloff("Ripple Inner Falloff", Float) = 0
 		_RippleOuterFalloff("Ripple Outer Falloff", Float) = 0
 
 		_CheckerboardAngle("Checkerboard Angle", Float) = 0
-		_CheckerboardScale("Checkerboard Scale", Float) = 0
+		_CheckerboardScale("Checkerboard Scale", Float) = 10
 		_CheckerboardShift("Checkerboard Shift Distance", Float) = 0
 		_Quantization("Quantization", Range(0,1)) = 0
 
@@ -223,22 +259,22 @@
 		_BlockDisplacementOffset("Block Displacement Offset", Float) = 0
 
 		_GlitchAngle("Glitch Angle", Float) = 0
-		_GlitchCount("Glitch Count", Range(0, 32)) = 0
-		_MinGlitchWidth("Min Glitch Width", Float) = 0
-		_MinGlitchHeight("Min Glitch Height", Float) = 0
-		_MaxGlitchWidth("Max Glitch Width", Float) = 0
-		_MaxGlitchHeight("Max Glitch Height", Float) = 0
+		_GlitchCount("Glitch Count", Range(0, 32)) = 10
+		_MinGlitchWidth("Min Glitch Width", Float) = 10
+		_MinGlitchHeight("Min Glitch Height", Float) = 10
+		_MaxGlitchWidth("Max Glitch Width", Float) = 20
+		_MaxGlitchHeight("Max Glitch Height", Float) = 20
 		_GlitchIntensity("Glitch Intensity", Float) = 0
 		_GlitchSeed("Glitch Seed", Float) = 0
 		_GlitchSeedInterval("Glitch Seed Interval", Float) = 1
 
-		_NoiseScale("Simplex Noise Scale", Float) = 0
+		_NoiseScale("Simplex Noise Scale", Float) = 10
 		_NoiseStrength("Simplex Noise Strength", Float) = 0
 		_NoiseOffset("Simplex Noise Offset", Float) = 0
 
-		_VoroniNoiseScale("Voroni Noise Scale", Float) = 0
+		_VoroniNoiseScale("Voroni Noise Scale", Float) = 10
 		_VoroniNoiseStrength("Voroni Noise Strength", Float) = 0
-		_VoroniNoiseBorderSize("Voroni Border Size", Float) = 0
+		_VoroniNoiseBorderSize("Voroni Border Size", Float) = 0.1
 		[Enum(NoEffect,0, Multiply,1, EmptySpace, 2)] _VoroniNoiseBorderMode("Voroni Border Mode", Float) = 0
 		_VoroniNoiseBorderStrength("Voroni Noise Border Strength", Float) = 1
 		_VoroniNoiseOffset("Voroni Noise Offset", Float) = 0
@@ -262,19 +298,26 @@
 		// Screen color effects
 		_EmptySpaceColor("Empty Space Color", Color) = (0, 0, 0, 1)
 
-		_SignalNoiseSize("Signal Noise Size", Float) = 0
+		_SignalNoiseSize("Signal Noise Size", Float) = 1
 		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
 		_SignalNoiseOpacity("Signal Noise Opacity", Float) = 0
 
-		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 100)) = 30
+		_BlurMovementSampleCount("Blur Movement Sample Count", Range(1, 100)) = 42
 		_BlurMovementTarget("Blur Movement Target", Range(0, 1)) = 0.5
 		_BlurMovementRange("Blur Movement Range", Range(0.001, 1)) = 1
 		_BlurMovementExtrapolation("Blur Movement Extrapolation", Range(0, 1)) = 0
 		_BlurMovementOpacity("Blur Movement Opacity", Range(0, 1)) = 0
+		_BlurMovementBlend("Blur Movement Blend", Range(-1, 1)) = 1
 
-		_ChromaticAbberationStrength("Chromatic Abberation Strength", Float) = 0
-		_ChromaticAbberationSeparation("Chromatic Abberation Separation", Float) = 1.5
-		[Enum(Spherical, 0, Flat, 1)] _ChromaticAbberationShape("Chromatic Abberation Shape", Float) = 0
+		_ChromaticAberrationStrength("Chromatic Aberration Strength", Float) = 0
+		_ChromaticAberrationSeparation("Chromatic Aberration Separation", Float) = 1.5
+		[Enum(Spherical, 0, Flat, 1)] _ChromaticAberrationShape("Chromatic Aberration Shape", Float) = 0
+		_ChromaticAberrationBlend("Chromatic Aberration Blend", Range(-1,1)) = 1
+
+		_DistortionDesyncR("Red Distortion Desync", Float) = 0
+		_DistortionDesyncG("Green Distortion Desync", Float) = 0
+		_DistortionDesyncB("Blue Distortion Desync", Float) = 0
+		_DistortionDesyncBlend("Distortion Desync Blend", Range(-1, 1)) = 1
 
 		_CircularVignetteColor("Circular Vignette Color", Color) = (0, 0, 0, 1)
 		_CircularVignetteOpacity("Circular Vignette Opacity", Range(0, 1)) = 0
@@ -282,6 +325,7 @@
 		_CircularVignetteRoundness("Circular Vignette Roundness", Range(0, 1)) = 1
 		_CircularVignetteBegin("Circular Vignette Begin Distance", Float) = 25
 		_CircularVignetteEnd("Circular Vignette End Distance", Float) = 50
+		[Enum(No, 0, Yes, 1)] _CircularVignetteScaleWithDistance("Circular Vignette Scale With Distance", Float) = 0
 
 		[Enum(None,0, Linear,1, Squared,2, Log2,3, Exponential,4)] _FogType("Fog Type (Requires Directional Light)", Float) = 0
 		_FogColor("Fog Color", Color) = (0, 0, 0, 1)
@@ -314,6 +358,7 @@
 		_Hue("Hue", Float) = 0
 		_Saturation("Saturation", Float) = 0
 		_Value("Value", Float) = 0
+		[Enum(No, 0, Yes, 1)] _ClampSaturation("Clamp Saturation", Float) = 0
 
 		[Enum(Multiply, 0, Add, 1, MulAdd, 2)] _ImaginaryColorBlendMode("Imaginary Color Blend Mode", Float) = 2
 		_ImaginaryColorOpacity("Imaginary Color Opacity", Float) = 0
@@ -324,18 +369,18 @@
 		_SobelOpacity("Sobel Opacity", Float) = 0
 		[Enum(None, 0, Multiply, 1, MulAdd, 2)] _SobelBlendMode("Sobel Blend Mode", Float) = 0
 
-		_colorSkewRDistance("Red Move Distance", Float) = 0
+		_colorSkewRDistance("Red Move Distance", Float) = 3
 		_colorSkewRAngle("Red Move Angle", Float) = 0
 		_colorSkewROpacity("Red Move Opacity", Float) = 0
 		[Enum(No, 0, Yes, 1)] _colorSkewROverride("Red Move Override", Float) = 0
 
-		_colorSkewGDistance("Green Move Distance", Float) = 0
+		_colorSkewGDistance("Green Move Distance", Float) = -3
 		_colorSkewGAngle("Green Move Angle", Float) = 0
 		_colorSkewGOpacity("Green Move Opacity", Float) = 0
 		[Enum(No, 0, Yes, 1)] _colorSkewGOverride("Green Move Override", Float) = 0
 
-		_colorSkewBDistance("Blue Move Distance", Float) = 0
-		_colorSkewBAngle("Blue Move Angle", Float) = 0
+		_colorSkewBDistance("Blue Move Distance", Float) = 3
+		_colorSkewBAngle("Blue Move Angle", Float) = -1.57079632
 		_colorSkewBOpacity("Blue Move Opacity", Float) = 0
 		[Enum(No, 0, Yes, 1)] _colorSkewBOverride("Blue Move Override", Float) = 0
 	}
@@ -348,7 +393,7 @@
 		Tags { "Queue" = "Overlay" }
 
 		// Don't write depth, and ignore the current depth.
-		Cull Front ZWrite Off ZTest Off
+		Cull[_CullMode] ZWrite[_ZWrite] ZTest[_ZTest]
 
 		// Blend against the current screen texture to allow for
 		// fading in/out the cancer effects and various other shenanigans.
@@ -379,6 +424,17 @@
 			"_stereoCancerTexture"
 		}
 
+		Stencil
+		{
+			Ref[_StencilRef]
+			Comp[_StencilComp]
+			Pass[_StencilOp]
+			Fail[_StencilFail]
+			ZFail[_StencilZFail]
+			ReadMask[_ReadMask]
+			WriteMask[_WriteMask]
+		}
+
 		Pass
 		{
 			CGPROGRAM
@@ -397,318 +453,15 @@
 			#include "SimplexNoise.cginc"
 			#include "VoroniNoise.cginc"
 
-			// Stereo Cancer function implementations
-			#include "StereoCancerFunctions.cginc"
-			
-			int _ParticleSystem;
-			float _CoordinateSpace;
-			float _CoordinateScale;
-			float _WorldSamplingMode;
-			float _WorldSamplingRange;
-			float _CancerEffectQuantization;
-			float _CancerEffectRotation;
-			float4 _CancerEffectOffset;
-			float _Visibility;
-			float _FalloffEnabled;
-			int _FalloffFlags;
-			float _FalloffBeginPercentage;
-			
-			// Image Overlay params
-			sampler2D _MemeTex;
-			float4 _MemeTex_TexelSize;
-			float4 _MemeTex_ST;
-			int _MemeImageColumns;
-			int _MemeImageRows;
-			int _MemeImageCount;
-			int _MemeImageIndex;
-			float _MemeImageAngle;
-			float _MemeTexOpacity;
-			int _MemeTexClamp;
-			int _MemeTexCutOut;
-			float _MemeTexAlphaCutOff;
-			float _MemeTexOverrideMode;
+			#include "StereoCancerParameters.cginc"
 
+			// Leave only grab pass texture parameters in the main shader file,
+			// that way layer creation only needs to parse one file.
 			sampler2D _stereoCancerTexture;
 			float4 _stereoCancerTexture_TexelSize;
 
-			sampler2D _CameraDepthTexture;
-			float4 _CameraDepthTexture_TexelSize;
-
-			float _CancerOpacity;
-
-			// Displacement Map params
-			sampler2D _DisplacementMap;
-			float4 _DisplacementMap_TexelSize;
-			float4 _DisplacementMap_ST;
-			int _DisplacementMapType;
-			int _DisplacementMapColumns;
-			int	_DisplacementMapRows;
-			int	_DisplacementMapCount;
-			int	_DisplacementMapIndex;
-			float _DisplacementMapAngle;
-			float _DisplacementMapIntensity;
-			int _DisplacementMapClamp;
-			int _DisplacementMapCutOut;
-
-			// Triplanar params
-			sampler2D _TriplanarMap;
-			float4 _TriplanarMap_ST;
-			float _TriplanarSampleSrc;
-			float _TriplanarCoordinateSrc;
-			float _TriplanarScale;
-			float _TriplanarOffsetX;
-			float _TriplanarOffsetY;
-			float _TriplanarOffsetZ;
-			float _TriplanarSharpness;
-			float _TriplanarQuality;
-			float _TriplanarBlendMode;
-			float _TriplanarOpacity;
-
-			// Screen distortion params
-			float _ShrinkWidth;
-			float _ShrinkHeight;
-
-			float _EyeConvergence;
-			float _EyeSeparation;
-
-			float _RotationX;
-			float _RotationY;
-			float _RotationZ;
-
-			float _MoveX;
-			float _MoveY;
-			float _MoveZ;
-
-			float _ScreenShakeSpeed;
-			float _ScreenShakeXIntensity;
-			float _ScreenShakeXAmplitude;
-			float _ScreenShakeYIntensity;
-			float _ScreenShakeYAmplitude;
-			float _ScreenShakeZIntensity;
-			float _ScreenShakeZAmplitude;
-
-			float _SplitXAngle;
-			float _SplitXDistance;
-			float _SplitXHalf;
-
-			float _SplitYAngle;
-			float _SplitYDistance;
-			float _SplitYHalf;
-
-			float _SkewXAngle;
-			float _SkewXDistance;
-			float _SkewXInterval;
-			float _SkewXOffset;
-
-			float _SkewYAngle;
-			float _SkewYDistance;
-			float _SkewYInterval;
-			float _SkewYOffset;
-
-			float _FanDistance;
-			float _FanScale;
-			float _FanBlades;
-			float _FanOffset;
-
-			float _GeometricDitherDistance;
-			float _GeometricDitherQuality;
-			float _GeometricDitherRandomization;
-
-			float _ColorVectorDisplacementStrength;
-			float _ColorVectorDisplacementCoordinateSpace;
-
-			float _NormalVectorDisplacementStrength;
-			float _NormalVectorDisplacementCoordinateSpace;
-			float _NormalVectorDisplacementQuality;
-
-			float _WarpIntensity;
-			float _WarpAngle;
-
-			float _BarXAngle;
-			float _BarXDistance;
-			float _BarXInterval;
-			float _BarXOffset;
-
-			float _BarYAngle;
-			float _BarYDistance;
-			float _BarYInterval;
-			float _BarYOffset;
-
-			float _SinBarXAngle;
-			float _SinBarXDistance;
-			float _SinBarXInterval;
-			float _SinBarXOffset;
-
-			float _SinBarYAngle;
-			float _SinBarYDistance;
-			float _SinBarYInterval;
-			float _SinBarYOffset;
-
-			float _CheckerboardAngle;
-			float _CheckerboardScale;
-			float _CheckerboardShift;
-			float _Quantization;
-
-			float _RingRotationInnerAngle;
-			float _RingRotationOuterAngle;
-			float _RingRotationRadius;
-			float _RingRotationWidth;
-
-			float _SpiralIntensity;
-
-			float _PolarInversionIntensity;
-
-			float _FishEyeIntensity;
-
-			float _SinWaveAngle;
-			float _SinWaveDensity;
-			float _SinWaveAmplitude;
-			float _SinWaveOffset;
-
-			float _CosWaveAngle;
-			float _CosWaveDensity;
-			float _CosWaveAmplitude;
-			float _CosWaveOffset;
-
-			float _TanWaveAngle;
-			float _TanWaveDensity;
-			float _TanWaveAmplitude;
-			float _TanWaveOffset;
-
-			float _SliceAngle;
-			float _SliceWidth;
-			float _SliceDistance;
-			float _SliceOffset;
-
-			float _RippleDensity;
-			float _RippleAmplitude;
-			float _RippleOffset;
-			float _RippleInnerFalloff;
-			float _RippleOuterFalloff;
-
-			float _ZigZagXAngle;
-			float _ZigZagXDensity;
-			float _ZigZagXAmplitude;
-			float _ZigZagXOffset;
-
-			float _ZigZagYAngle;
-			float _ZigZagYDensity;
-			float _ZigZagYAmplitude;
-			float _ZigZagYOffset;
-
-			float _KaleidoscopeSegments;
-			float _KaleidoscopeAngle;
-
-			float _BlockDisplacementAngle;
-			float _BlockDisplacementSize;
-			float _BlockDisplacementIntensity;
-			float _BlockDisplacementMode;
-			float _BlockDisplacementOffset;
-
-			float _GlitchAngle;
-			float _GlitchCount;
-			float _MinGlitchWidth;
-			float _MinGlitchHeight;
-			float _MaxGlitchWidth;
-			float _MaxGlitchHeight;
-			float _GlitchIntensity;
-			float _GlitchSeed;
-			float _GlitchSeedInterval;
-
-			float _NoiseScale;
-			float _NoiseStrength;
-			float _NoiseOffset;
-
-			float _VoroniNoiseScale;
-			float _VoroniNoiseStrength;
-			float _VoroniNoiseBorderSize;
-			float _VoroniNoiseBorderMode;
-			float _VoroniNoiseBorderStrength;
-			float _VoroniNoiseOffset;
-
-			// Screen color params
-			float4 _EmptySpaceColor;
-
-			float _FogType;
-			float4 _FogColor;
-			float _FogBegin;
-			float _FogEnd;
-
-			float4 _EdgelordStripeColor;
-			float _EdgelordStripeSize;
-			float _EdgelordStripeOffset;
-
-			float4 _ColorMask;
-
-			float _PaletteOpacity;
-			float _PaletteScale;
-			float _PaletteOffset;
-			float _PalleteSource;
-			float4 _PaletteA;
-			float4 _PaletteB;
-			float4 _PaletteOscillation;
-			float4 _PalettePhase;
-
-			float _ColorInversionR;
-			float _ColorInversionG;
-			float _ColorInversionB;
-
-			float _ColorModifierMode;
-			float _ColorModifierStrength;
-			float _ColorModifierBlend;
-
-			float _Hue;
-			float _Saturation;
-			float _Value;
-
-			float _ImaginaryColorBlendMode;
-			float _ImaginaryColorOpacity;
-			float _ImaginaryColorAngle;
-
-			float _BlurMovementSampleCount;
-			float _BlurMovementTarget;
-			float _BlurMovementRange;
-			float _BlurMovementExtrapolation;
-			float _BlurMovementOpacity;
-
-			float _ChromaticAbberationStrength;
-			float _ChromaticAbberationSeparation;
-			float _ChromaticAbberationShape;
-
-			float _SignalNoiseSize;
-			float _ColorizedSignalNoise;
-			float _SignalNoiseOpacity;
-
-			float4 _CircularVignetteColor;
-			float _CircularVignetteOpacity;
-			float _CircularVignetteRoundness;
-			float _CircularVignetteMode;
-			float _CircularVignetteBegin;
-			float _CircularVignetteEnd;
-
-			float _SobelSearchDistance;
-			float _SobelQuality;
-			float _SobelOpacity;
-			float _SobelBlendMode;
-
-			float _colorSkewRDistance;
-			float _colorSkewRAngle;
-			float _colorSkewROpacity;
-			float _colorSkewROverride;
-
-			float _colorSkewGDistance;
-			float _colorSkewGAngle;
-			float _colorSkewGOpacity;
-			float _colorSkewGOverride;
-
-			float _colorSkewBDistance;
-			float _colorSkewBAngle;
-			float _colorSkewBOpacity;
-			float _colorSkewBOverride;
-
-			// For some magic reason, these have to be down here or the shader explodes.
-			float _CancerDisplayMode;
-			float _ScreenSamplingMode;
+			// Stereo Cancer function implementations
+			#include "StereoCancerFunctions.cginc"
 
 			struct appdata
 			{
@@ -721,37 +474,44 @@
 			struct v2f
 			{
 				float4 pos : SV_POSITION;
-				float4 worldPos: TEXCOORD1;
+				float4 viewPos: TEXCOORD1;
+
 				nointerpolation float3 camFront : TEXCOORD2;
 				nointerpolation float3 camRight : TEXCOORD3;
 				nointerpolation float3 camUp : TEXCOORD4;
 				nointerpolation float3 camPos : TEXCOORD5;
-				nointerpolation float3x3 viewMatRot : TEXCOORD6;
-				nointerpolation float3x3 inverseViewMatRot : TEXCOORD9;
-				nointerpolation float2 colorDistortionFalloff : TEXCOORD12;
+				nointerpolation float3 centerCamPos : TEXCOORD6;
+				nointerpolation float3 objPos : TEXCOORD7;
+				nointerpolation float3 screenSpaceObjPos : TEXCOORD8;
+				nointerpolation float2 colorDistortionFalloff : TEXCOORD9;
 			};
 
 			v2f vert (appdata v)
 			{
 				v2f o;
 
-				o.viewMatRot = extract_rotation_matrix(UNITY_MATRIX_V);
-				o.inverseViewMatRot = transpose(o.viewMatRot);
-
-				// I could normalize the direction vectors, or I could just live dangerously
-				// with reckless abandon to save insignificant amounts of performance.
-				//
 				// Note: This does not utilize cross products to avoid the issue where
 				//		 at certain rotations the Up and Right vectors will flip.
 				//		 (Roll of +-30 degrees and +-90 degrees).
-				o.camFront = mul((float3x3)o.inverseViewMatRot, float3(0, 0, 1));
-				o.camUp = mul((float3x3)o.inverseViewMatRot, float3(0, 1, 0));
-				o.camRight = mul((float3x3)o.inverseViewMatRot, float3(1, 0, 0));
+				o.camFront = normalize(mul((float3x3)unity_CameraToWorld, float3(0, 0, 1)));
+				o.camUp = normalize(mul((float3x3)unity_CameraToWorld, float3(0, 1, 0)));
+				o.camRight = normalize(mul((float3x3)unity_CameraToWorld, float3(1, 0, 0)));
 
-				// The particle knows where it is, and where it isn't.
-				// It subtracts where it is, from where it isn't,
-				// to move vertices to where they wasn't.
-				//
+				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
+				o.camPos = float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
+
+#if defined(USING_STEREO_MATRICES)
+				o.centerCamPos = lerp(
+					float3(unity_StereoCameraToWorld[0][0][3], unity_StereoCameraToWorld[0][1][3], unity_StereoCameraToWorld[0][2][3]),
+					float3(unity_StereoCameraToWorld[1][0][3], unity_StereoCameraToWorld[1][1][3], unity_StereoCameraToWorld[1][2][3]),
+					0.5);
+#else
+				o.centerCamPos = o.camPos;
+#endif
+
+				// Extract object position from the model matrix.
+				o.objPos = float3(UNITY_MATRIX_M[0][3], UNITY_MATRIX_M[1][3], UNITY_MATRIX_M[2][3]);
+
 				// Usage: Set the following Renderer settings for the particle system
 				//		  Render Alignment: World
 				//		  Custom Vertex Streams:
@@ -760,46 +520,35 @@
 				//				Size.x   (TEXCOORD0.w)
 				if (_ParticleSystem == 1)
 				{
-					// Move particle back to the coordinates (0,0,0)
-					// and remove scaling.
-					float3 particleSystemOrigin = v.uv.xyz;
-					v.vertex.xyz -= particleSystemOrigin;
-
-					v.vertex.xyz *= rcp(v.uv.w);
+					o.objPos = v.uv.xyz;
 				}
 				
-				// Scale the shape so that the user isn't able to see the sides
-				// of the object being shaded. Some maps use a small maximum
-				// Z distance, so the Z-Axis must be scaled a smaller amount.
-				v.vertex.xy *= 10000;
-				v.vertex.z *= 100;
+				// Fullscreen
+				if (_ObjectDisplayMode == 0)
+				{
+					// Place the mesh on the viewer's face, and ensure it covers the entire view
+					// even when the user is looking at a mirror at a near-perpindicular angle.
+					// Note: This won't handle extraordinarily large mirrors, leaving a gap on the sides
+					//		 of what the viewer can see.
+					v.vertex.xyz *= 100;
 
-				// Rotate the object to match the user's view direction
-				// and then place it onto their face
-				//
-				// I'm pretty sure I could do this without any matrix math.
-				// However the current implementation is fully tested to have no issues,
-				// and when I'm only going to be calcualting a grand total of
-				// 8 verts it won't make a real-world performance difference.
-				//
-				// Hey, remember that comment above about saving insignificant amounts
-				// of performance...?
-				o.worldPos = float4(mul(o.inverseViewMatRot, v.vertex), 1);
+					o.viewPos = v.vertex + float4(o.camPos, 0);
+					o.viewPos = mul(UNITY_MATRIX_V, o.viewPos);
+				}
+				// World Scale
+				else
+				{
+					o.viewPos = mul(UNITY_MATRIX_MV, v.vertex);
+				}
 
-				// Apparently the built-in _WorldSpaceCameraPos can't be trusted...so manually access the camera position.
-				o.camPos = float3(unity_CameraToWorld[0][3], unity_CameraToWorld[1][3], unity_CameraToWorld[2][3]);
-
-				o.worldPos.xyz += o.camPos;
-
-				o.pos = mul(UNITY_MATRIX_VP, o.worldPos);
-
-				// Align world pos with default world axis.
-				//
-				// This makes it easy to write effects as the coordinates
-				// are all on a 2D XY plane, 100 units away from the camera.
-				o.worldPos.xyz = v.vertex.xyz;
+				o.pos = mul(UNITY_MATRIX_P, o.viewPos);
 
 				// If visiblity isn't global...
+				//
+				// Note: With Avatar 3.0 you should use the isLocal variable instead unless you want
+				//		 to prevent hacking clients from flipping the local check.
+				//		 This would allow you to get the same effect without increasing your avatar
+				//		 bounds to 10,000.
 				if (_Visibility > 0)
 				{
 					// Assumes the following:
@@ -820,86 +569,160 @@
 				}
 
 				o.colorDistortionFalloff = float2(1, 1);
-				// When enabled, evicts the vertex to outer-space when the camera is outside of the cube
-				if (_FalloffEnabled != 0)
+				// When enabled, generates falloff values and evicts the vertex to outer-space once falloff reaches zero.
+				if (_FalloffEnabled == 1)
 				{
-					// For VR we want to use a consistent camera position so that the eyes get the same amount
+					// For VR we want to use a consistent camera position and direction so that the eyes get the same amount
 					// of opacity and distortion reduction.
 #if defined(USING_STEREO_MATRICES)
-					float3 centerCamPos = lerp(
-						float3(unity_StereoCameraToWorld[0][0][3], unity_StereoCameraToWorld[0][1][3], unity_StereoCameraToWorld[0][2][3]),
-						float3(unity_StereoCameraToWorld[1][0][3], unity_StereoCameraToWorld[1][1][3], unity_StereoCameraToWorld[1][2][3]),
-						0.5);
+					int otherCameraIndex = 1 - unity_StereoEyeIndex;
+					float3 centerCamDir = lerp(o.camFront, mul((float3x3)unity_StereoCameraToWorld[otherCameraIndex], float3(0, 0, 1)), 0.5);
+					centerCamDir = normalize(centerCamDir);
 #else
-					float3 centerCamPos = o.camPos;
+					float3 centerCamDir = o.camFront;
 #endif
-
-					// Handle non-uniform scaling and rotation in one easy step!
-					float3 objSpaceCamPos = abs(mul(unity_WorldToObject, float4(centerCamPos, 1)).xyz);
-					if (any(objSpaceCamPos > 0.5))
+					float distanceFalloffAlpha = 1;
+					
+					// Normal Objects
+					if (_ParticleSystem == 0)
 					{
-						o.pos = float4(9999, 9999, 9999, 9999);
+						// Handle non-uniform scaling and rotation in one easy step!
+						float3 objSpaceCamPos = abs(mul(unity_WorldToObject, float4(o.centerCamPos, 1)).xyz);
+
+						distanceFalloffAlpha = max(max(objSpaceCamPos.x, objSpaceCamPos.y), objSpaceCamPos.z);
 					}
+					// Particles
 					else
 					{
-						float falloffAlpha = max(max(objSpaceCamPos.x, objSpaceCamPos.y), objSpaceCamPos.z);
-						float falloffMin = (0.5*_FalloffBeginPercentage);
-
-						falloffAlpha = smoothstep(falloffMin, 0.5, falloffAlpha);
-						o.colorDistortionFalloff.xy -= float2(falloffAlpha*((_FalloffFlags & 1) != 0), falloffAlpha*((_FalloffFlags & 2) != 0));
+						// Particle model matrix (UNITY_MATRIX_M) doesn't contain scale or translation,
+						// so a spherical distance check will do just fine as a replacement.
+						distanceFalloffAlpha = distance(o.objPos, o.centerCamPos) * (rcp(v.uv.w) * 0.5);
 					}
+
+					float falloffMin = (0.5 * _FalloffBeginPercentage);
+					float falloffMax = (0.5 * _FalloffEndPercentage);
+					distanceFalloffAlpha = smoothstep(falloffMin, falloffMax, distanceFalloffAlpha);
+					o.colorDistortionFalloff.xy -= distanceFalloffAlpha*float2((_FalloffFlags & 1) != 0, (_FalloffFlags & 2) != 0);
+					
+					// Angle falloff, basically required for good Centered On Object coordinate space usage.
+					if (_FalloffAngleBegin < 1)
+					{
+						float3 toObjectVec = normalize(o.objPos - o.centerCamPos);
+						float angle = clamp(dot(toObjectVec, centerCamDir), -1, 1);
+
+						float angleFalloffBegin = 1 - _FalloffAngleBegin;
+						float angleFalloffEnd = 1 - _FalloffAngleEnd;
+
+						float angleFalloffAlpha = smoothstep(angleFalloffBegin, angleFalloffEnd, angle);
+						
+						o.colorDistortionFalloff.xy -= angleFalloffAlpha*float2((_FalloffFlags & 1) != 0, (_FalloffFlags & 2) != 0);
+					}
+
+					// Ensure we haven't gone negative after applying both types of falloff.
+					o.colorDistortionFalloff.xy = clamp(o.colorDistortionFalloff.xy, 0, 1);
+
+					// No output, evict mesh to outer-space.
+					if (!any(o.colorDistortionFalloff))
+						o.pos = float4(9999, 9999, 9999, 9999);
 				}
 
 				// Evicts the vertex to outer-space when visibility doesn't match the display mode.
 				if(mirrorCheck(_CancerDisplayMode))
 					o.pos = float4(9999, 9999, 9999, 9999);
-				
+
+				// Convert object position to screen-space after all coordinate space math
+				// is finished.
+				o.screenSpaceObjPos = mul(UNITY_MATRIX_V, float4(o.objPos, 1));
+				o.screenSpaceObjPos /= o.screenSpaceObjPos.z;
+
+				o.screenSpaceObjPos.xy *= float2(50, -50);
+
 				return o;
 			}
 
 			fixed4 frag(v2f i) : SV_Target
 			{
-				// Discards when visibility doesn't match the display mode.
-				if (mirrorCheck(_CancerDisplayMode))
-					discard;
+				if (_DisplayOnSurface)
+				{
+					// Normally the normalization inverts the coordinates since view-space Z is negative,
+					// so we need to reproduce that here. Additionally, the screen space object position
+					// needs to be scaled by the view position so that when using Centered On Object
+					// coordinates the origin doesn't fly away with view distance.
+					i.viewPos.xyz *= -1;
+					i.screenSpaceObjPos.xy *= i.viewPos.z;
+				}
+				else
+				{
+					// Normalize onto the Z plane to get our 2D coordinates for easy distortion math.
+					i.viewPos.xyz /= i.viewPos.z;
+				}
+			
+				// The new screen-space coordinate system is backwards and smaller compared to the old
+				// system. So in order to prevent breaking all previously made effects we need to
+				// invert and scale our coordinates.
+				i.viewPos.xyz *= float3(50, -50, -50);
+
+				// Centered On Object coordinate space
+				UNITY_BRANCH
+				if(_CoordinateSpace == 2)
+					i.viewPos.xy -= i.screenSpaceObjPos.xy;
 				
 				// Vector from the 'camera' to the world-axis aligned worldPos.
-				float3 worldVector = normalize(i.worldPos);
+				float3 worldVector = normalize(i.viewPos);
 
 				// Projected coordinate space
 				UNITY_BRANCH
 				if (_CoordinateSpace == 1)
-					i.worldPos = projectCoordinates(_CameraDepthTexture, i.inverseViewMatRot, i.worldPos, i.camPos, worldVector);
+					i.viewPos = projectCoordinates(_CameraDepthTexture, i.viewPos, i.camPos, worldVector);
 
 				// Allow for easily changing effect intensities without having to modify
 				// an entire animation. Also very useful for adjusting projected coordinates.
-				i.worldPos.xyz *= _CoordinateScale;
+				i.viewPos.xyz *= _CoordinateScale;
 
 				// Quantize the distortion effects separately from the screen
 				float3 cancerEffectQuantizationVector = float3(0, 0, 0);
 				UNITY_BRANCH
 				if (_CancerEffectQuantization != 0)
 				{
-					cancerEffectQuantizationVector = i.worldPos.xyz;
-					i.worldPos = stereoQuantization(i.worldPos, 10.0 - _CancerEffectQuantization * 10.0);
+					cancerEffectQuantizationVector = i.viewPos.xyz;
+					i.viewPos = stereoQuantization(i.viewPos, 10.0 - _CancerEffectQuantization * 10.0);
 
-					cancerEffectQuantizationVector = i.worldPos.xyz - cancerEffectQuantizationVector;
+					cancerEffectQuantizationVector = i.viewPos.xyz - cancerEffectQuantizationVector;
 				}
 
 				// Rotate the effects separately from the screen
 				UNITY_BRANCH
 				if (_CancerEffectRotation != 0)
-					i.worldPos.xy = rotate2D(i.worldPos.xy, _CancerEffectRotation);
+					i.viewPos.xy = rotate2D(i.viewPos.xy, _CancerEffectRotation);
 
 				// Move the cancer coordiantes separately from the screen
-				i.worldPos.xyz += _CancerEffectOffset.xyz;
+				i.viewPos.xyz += _CancerEffectOffset.xyz;
+
+				// Allow for wrapping the cancer effect coordinates separately from the screen
+				float3 cancerEffectWrapVector = float3(0, 0, 0);
+				UNITY_BRANCH
+				if (_CancerEffectRange != 1)
+				{
+					cancerEffectWrapVector = i.viewPos.xyz;
+					i.viewPos = wrapWorldCoordinates(i.viewPos, _CancerEffectRange);
+
+					cancerEffectWrapVector = i.viewPos.xyz - cancerEffectWrapVector;
+				}
+
+				float cameraRollAngle = 0;
+				UNITY_BRANCH
+				if (_RemoveCameraRoll)
+				{
+					// Note: Cancer coordinates will flip upside down when the camera angle beyond 90 degrees up or down.
+					cameraRollAngle = atan2(i.camRight.y, i.camUp.y);
+
+					i.viewPos.xy = rotate2D(i.viewPos.xy, cameraRollAngle);
+				}
 
 				// Store the starting position to allow for things like using the
 				// derivative (ddx, ddy) to calculate nearby positions to sample depth.
-				float4 startingAxisAlignedPos = i.worldPos;
-				float4 startingWorldPos = startingAxisAlignedPos;
-				startingWorldPos.xyz = mul(i.inverseViewMatRot, startingWorldPos.xyz);
-				startingWorldPos.xyz += i.camPos;
+				float4 startingAxisAlignedPos = i.viewPos;
+				float4 startingWorldPos = computeWorldPositionFromAxisPosition(startingAxisAlignedPos);
 
 				// Default world-axis values for usage with axis-based effects
 				const float3 axisFront = float3(0, 0, -1);
@@ -922,58 +745,61 @@
 				////////////////////////////////////
 				UNITY_BRANCH
 				if (_EyeConvergence != 0)
-					i.worldPos = stereoEyeConvergence(i.worldPos, axisUp, _EyeConvergence);
+					i.viewPos = stereoEyeConvergence(i.viewPos, axisUp, _EyeConvergence);
 
 				UNITY_BRANCH
 				if(_EyeSeparation != 0)
-					i.worldPos = stereoEyeSeparation(i.worldPos, axisRight, _EyeSeparation);
+					i.viewPos = stereoEyeSeparation(i.viewPos, axisRight, _EyeSeparation);
 
 				  //////////////////////////////////////////
 				 // Apply World-Space Distortion Effects //
 				//////////////////////////////////////////
 				UNITY_BRANCH
 				if (_ShrinkHeight != 0)
-					i.worldPos.y += i.worldPos.y*(_ShrinkHeight * 0.02);
+					i.viewPos.y += i.viewPos.y*(_ShrinkHeight * 0.02);
 				UNITY_BRANCH
 				if (_ShrinkWidth != 0)
-					i.worldPos.x += i.worldPos.x*(_ShrinkWidth * 0.02);
+					i.viewPos.x += i.viewPos.x*(_ShrinkWidth * 0.02);
 
 				UNITY_BRANCH
 				if(_RotationX != 0)
-					i.worldPos.zy = rotate2D(i.worldPos.zy, _RotationX);
+					i.viewPos.zy = rotate2D(i.viewPos.zy, _RotationX);
 				UNITY_BRANCH
 				if (_RotationY != 0)
-					i.worldPos.xz = rotate2D(i.worldPos.xz, _RotationY);
+					i.viewPos.xz = rotate2D(i.viewPos.xz, _RotationY);
 				UNITY_BRANCH
 				if (_RotationZ != 0)
-					i.worldPos.xy = rotate2D(i.worldPos.xy, _RotationZ);
+					i.viewPos.xy = rotate2D(i.viewPos.xy, _RotationZ);
 
-				i.worldPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
+				i.viewPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
 
 				UNITY_BRANCH
 				if(_ScreenShakeXIntensity != 0 || _ScreenShakeYIntensity != 0 || _ScreenShakeZIntensity != 0)
-					i.worldPos = stereoShake(i.worldPos, _ScreenShakeSpeed, _ScreenShakeXIntensity, _ScreenShakeXAmplitude, _ScreenShakeYIntensity, _ScreenShakeYAmplitude,
+					i.viewPos = stereoShake(i.viewPos, _ScreenShakeSpeed, _ScreenShakeXIntensity, _ScreenShakeXAmplitude, _ScreenShakeYIntensity, _ScreenShakeYAmplitude,
 						_ScreenShakeZIntensity, _ScreenShakeZAmplitude);
 
 				UNITY_BRANCH
 				if (_SplitXDistance != 0)
 				{
-					float flipPoint = i.worldPos.x;
+					// Since this function sets clearPixel for pixels inside the split
+					// we need to scale the split point to syncronize with distortion
+					// falloff.
+					float flipPoint = i.viewPos.x/i.colorDistortionFalloff.y;
 					UNITY_BRANCH
 					if (_SplitXAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _SplitXAngle).x;
+						flipPoint = rotate2D(i.viewPos.xy, _SplitXAngle).x;
 
-					i.worldPos = stereoSplit(i.worldPos, axisRight, flipPoint, _SplitXDistance, _SplitXHalf, clearPixel);
+					i.viewPos = stereoSplit(i.viewPos, axisRight, flipPoint, _SplitXDistance, _SplitXHalf, clearPixel);
 				}
 				UNITY_BRANCH
 				if (_SplitYDistance != 0)
 				{
-					float flipPoint = i.worldPos.y;
+					float flipPoint = i.viewPos.y/i.colorDistortionFalloff.y;
 					UNITY_BRANCH
 					if (_SplitYAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _SplitYAngle).y;
+						flipPoint = rotate2D(i.viewPos.xy, _SplitYAngle).y;
 
-					i.worldPos = stereoSplit(i.worldPos, axisUp, flipPoint, _SplitYDistance, _SplitYHalf, clearPixel);
+					i.viewPos = stereoSplit(i.viewPos, axisUp, flipPoint, _SplitYDistance, _SplitYHalf, clearPixel);
 				}
 
 				// At interval of 0 the screen will be blank,
@@ -983,89 +809,89 @@
 				{
 					UNITY_BRANCH
 					if(_SkewXAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _SkewXAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _SkewXAngle);
 
-					i.worldPos = stereoSkew(i.worldPos, axisRight, i.worldPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
+					i.viewPos = stereoSkew(i.viewPos, axisRight, i.viewPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
 
 					UNITY_BRANCH
 					if (_SkewXAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_SkewXAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_SkewXAngle);
 				}
 				UNITY_BRANCH
 				if (_SkewYDistance != 0 && _SkewYInterval != 0)
 				{
 					UNITY_BRANCH
 					if (_SkewYAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _SkewYAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _SkewYAngle);
 
-					i.worldPos = stereoSkew(i.worldPos, axisUp, i.worldPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
+					i.viewPos = stereoSkew(i.viewPos, axisUp, i.viewPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 
 					UNITY_BRANCH
 					if (_SkewYAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_SkewYAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_SkewYAngle);
 				}
 
 				UNITY_BRANCH
 				if (_BarXDistance != 0)
 				{
-					float flipPoint = i.worldPos.y;
+					float flipPoint = i.viewPos.y;
 					UNITY_BRANCH
 					if (_BarXAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _BarXAngle).y;
+						flipPoint = rotate2D(i.viewPos.xy, _BarXAngle).y;
 
-					i.worldPos = stereoBar(i.worldPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
+					i.viewPos = stereoBar(i.viewPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
 				}
 				UNITY_BRANCH
 				if (_BarYDistance != 0)
 				{
-					float flipPoint = i.worldPos.x;
+					float flipPoint = i.viewPos.x;
 					UNITY_BRANCH
 					if (_BarYAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _BarYAngle).x;
+						flipPoint = rotate2D(i.viewPos.xy, _BarYAngle).x;
 
-					i.worldPos = stereoBar(i.worldPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
+					i.viewPos = stereoBar(i.viewPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
 				}
 
 				UNITY_BRANCH
 				if (_SinBarXDistance != 0 && _SinBarXInterval != 0)
 				{
-					float flipPoint = i.worldPos.y;
+					float flipPoint = i.viewPos.y;
 					UNITY_BRANCH
 					if (_SinBarXAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _SinBarXAngle).y;
+						flipPoint = rotate2D(i.viewPos.xy, _SinBarXAngle).y;
 
-					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
+					i.viewPos = stereoSinBar(i.viewPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
 				}
 				UNITY_BRANCH
 				if (_SinBarYDistance != 0 && _SinBarYInterval != 0)
 				{
-					float flipPoint = i.worldPos.x;
+					float flipPoint = i.viewPos.x;
 					UNITY_BRANCH
 					if (_SinBarYAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _SinBarYAngle).x;
+						flipPoint = rotate2D(i.viewPos.xy, _SinBarYAngle).x;
 
-					i.worldPos = stereoSinBar(i.worldPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+					i.viewPos = stereoSinBar(i.viewPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
 				}
 
 				UNITY_BRANCH
 				if (_ZigZagXDensity != 0)
 				{
-					float flipPoint = i.worldPos.y;
+					float flipPoint = i.viewPos.y;
 					UNITY_BRANCH
 					if (_ZigZagXAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _ZigZagXAngle).y;
+						flipPoint = rotate2D(i.viewPos.xy, _ZigZagXAngle).y;
 
-					i.worldPos = stereoZigZag(i.worldPos, axisRight, flipPoint, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
+					i.viewPos = stereoZigZag(i.viewPos, axisRight, flipPoint, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
 				}
 				UNITY_BRANCH
 				if (_ZigZagYDensity != 0)
 				{
-					float flipPoint = i.worldPos.x;
+					float flipPoint = i.viewPos.x;
 					UNITY_BRANCH
 					if (_ZigZagYAngle != 0)
-						flipPoint = rotate2D(i.worldPos.xy, _ZigZagYAngle).x;
+						flipPoint = rotate2D(i.viewPos.xy, _ZigZagYAngle).x;
 
-					i.worldPos = stereoZigZag(i.worldPos, axisUp, flipPoint, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
+					i.viewPos = stereoZigZag(i.viewPos, axisUp, flipPoint, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 				}
 
 				UNITY_BRANCH
@@ -1076,14 +902,14 @@
 					if (_SinWaveAngle != 0)
 					{
 						axis.xy = rotate2D(axis.xy, _SinWaveAngle);
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _SinWaveAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _SinWaveAngle);
 					}
 
-					i.worldPos = stereoSinWave(i.worldPos, axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
+					i.viewPos = stereoSinWave(i.viewPos, axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
 
 					UNITY_BRANCH
 					if (_SinWaveAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_SinWaveAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_SinWaveAngle);
 				}
 				UNITY_BRANCH
 				if (_CosWaveDensity != 0)
@@ -1093,14 +919,14 @@
 					if (_CosWaveAngle != 0)
 					{
 						axis.xy = rotate2D(axis.xy, _CosWaveAngle);
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _CosWaveAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _CosWaveAngle);
 					}
 
-					i.worldPos = stereoCosWave(i.worldPos, axis, _CosWaveDensity / 100, _CosWaveAmplitude, _CosWaveOffset);
+					i.viewPos = stereoCosWave(i.viewPos, axis, _CosWaveDensity / 100, _CosWaveAmplitude, _CosWaveOffset);
 
 					UNITY_BRANCH
 					if (_CosWaveAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_CosWaveAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_CosWaveAngle);
 				}
 				UNITY_BRANCH
 				if (_TanWaveDensity != 0)
@@ -1110,68 +936,68 @@
 					if (_TanWaveAngle != 0)
 					{
 						axis.xy = rotate2D(axis.xy, _TanWaveAngle);
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _TanWaveAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _TanWaveAngle);
 					}
 
-					i.worldPos = stereoTanWave(i.worldPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
+					i.viewPos = stereoTanWave(i.viewPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
 
 					UNITY_BRANCH
 					if (_TanWaveAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_TanWaveAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_TanWaveAngle);
 				}
 
 				UNITY_BRANCH
 				if (_SliceDistance != 0)
-					i.worldPos = stereoSlice(i.worldPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance, _SliceOffset);
+					i.viewPos = stereoSlice(i.viewPos, axisUp, _SliceAngle, _SliceWidth, _SliceDistance, _SliceOffset);
 				
 				UNITY_BRANCH
 				if (_RippleAmplitude != 0)
-					i.worldPos = stereoRipple(i.worldPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleInnerFalloff, _RippleOuterFalloff);
+					i.viewPos = stereoRipple(i.viewPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleInnerFalloff, _RippleOuterFalloff);
 
 				UNITY_BRANCH
 				if (_CheckerboardScale != 0)
-					i.worldPos = stereoCheckerboard(i.worldPos, axisFront, _CheckerboardAngle, _CheckerboardScale, _CheckerboardShift);
+					i.viewPos = stereoCheckerboard(i.viewPos, axisFront, _CheckerboardAngle, _CheckerboardScale, _CheckerboardShift);
 
 				UNITY_BRANCH
 				if (_Quantization != 0)
-					i.worldPos = stereoQuantization(i.worldPos, 10.0 - _Quantization*10.0);
+					i.viewPos = stereoQuantization(i.viewPos, 10.0 - _Quantization*10.0);
 
 				UNITY_BRANCH
 				if (_RingRotationWidth != 0)
-					i.worldPos = stereoRingRotation(i.worldPos, _RingRotationInnerAngle, _RingRotationOuterAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
+					i.viewPos = stereoRingRotation(i.viewPos, _RingRotationInnerAngle, _RingRotationOuterAngle, _RingRotationRadius / 10, _RingRotationWidth / 10);
 
 				UNITY_BRANCH
 				if (_WarpIntensity != 0)
-					i.worldPos = stereoWarp(i.worldPos, axisFront, _WarpAngle, _WarpIntensity);
+					i.viewPos = stereoWarp(i.viewPos, axisFront, _WarpAngle, _WarpIntensity);
 
 				UNITY_BRANCH
 				if (_SpiralIntensity != 0)
-					i.worldPos = stereoSpiral(i.worldPos, _SpiralIntensity / 1000);
+					i.viewPos = stereoSpiral(i.viewPos, _SpiralIntensity / 1000);
 
 				UNITY_BRANCH
 				if (_PolarInversionIntensity != 0)
-					i.worldPos = stereoPolarInversion(i.worldPos, _PolarInversionIntensity);
+					i.viewPos = stereoPolarInversion(i.viewPos, _PolarInversionIntensity);
 
 				UNITY_BRANCH
 				if(_FishEyeIntensity != 0)
-					i.worldPos = stereoFishEye(i.worldPos, axisFront, _FishEyeIntensity);
+					i.viewPos = stereoFishEye(i.viewPos, axisFront, _FishEyeIntensity);
 
 				UNITY_BRANCH
 				if(_KaleidoscopeSegments > 0)
-					i.worldPos = stereoKaleidoscope(i.worldPos, _KaleidoscopeAngle, _KaleidoscopeSegments);
+					i.viewPos = stereoKaleidoscope(i.viewPos, _KaleidoscopeAngle, _KaleidoscopeSegments);
 
 				UNITY_BRANCH
 				if (_BlockDisplacementSize != 0)
 				{
 					UNITY_BRANCH
 					if (_BlockDisplacementAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _BlockDisplacementAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _BlockDisplacementAngle);
 
-					i.worldPos = stereoBlockDisplacement(i.worldPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
+					i.viewPos = stereoBlockDisplacement(i.viewPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
 
 					UNITY_BRANCH
 					if (_BlockDisplacementAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_BlockDisplacementAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_BlockDisplacementAngle);
 				}
 
 				// Think you have enough function parameters there buddy?
@@ -1180,39 +1006,41 @@
 				{
 					UNITY_BRANCH
 					if (_GlitchAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, _GlitchAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _GlitchAngle);
 
-					i.worldPos = stereoGlitch(i.worldPos, axisFront, axisRight, axisUp,
+					i.viewPos = stereoGlitch(i.viewPos, axisFront, axisRight, axisUp,
 						_GlitchCount, _MinGlitchWidth, _MinGlitchHeight, _MaxGlitchWidth, 
 						_MaxGlitchHeight, _GlitchIntensity, _GlitchSeed, _GlitchSeedInterval);
 
 					UNITY_BRANCH
 					if (_GlitchAngle != 0)
-						i.worldPos.xy = rotate2D(i.worldPos.xy, -_GlitchAngle);
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_GlitchAngle);
 				}
 
 				UNITY_BRANCH
 				if(_NoiseScale != 0 && _NoiseStrength != 0)
-					i.worldPos.xyz += snoise((i.worldPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
+					i.viewPos.xyz += snoise((i.viewPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
 				UNITY_BRANCH
 				if (_VoroniNoiseScale != 0 && (_VoroniNoiseStrength != 0 || _VoroniNoiseBorderStrength != 0))
-					i.worldPos = stereoVoroniNoise(i.worldPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
+					i.viewPos = stereoVoroniNoise(i.viewPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
 					
 				UNITY_BRANCH
 				if (_FanDistance != 0 && _FanScale != 0)
-					i.worldPos = fan(i.worldPos, axisRight, axisUp, _FanScale, _FanDistance*0.1, _FanBlades, _FanOffset*0.1);
+					i.viewPos = fan(i.viewPos, axisRight, axisUp, _FanScale, _FanDistance*0.1, _FanBlades, _FanOffset*0.1);
 
 				UNITY_BRANCH
 				if (_GeometricDitherDistance != 0)
-					i.worldPos = geometricDither(i.worldPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
+					i.viewPos = geometricDither(i.viewPos, axisRight, axisUp, _GeometricDitherDistance, _GeometricDitherQuality, _GeometricDitherRandomization);
 
 				// Apply displacement map after distortion effects so that it isn't just a static element.
 				UNITY_BRANCH
 				if (_DisplacementMapIntensity != 0)
 				{
-					float4 samplePosition = i.worldPos;
+					float4 samplePosition = i.viewPos;
 					if (_DisplacementMapAngle != 0)
 						samplePosition.xy = rotate2D(samplePosition.xy, _DisplacementMapAngle);
+
+					samplePosition.xy *= 1 + _DisplacementMapScaleWithDistance*distance(i.centerCamPos, i.objPos);
 
 					bool dropDistortion = false;
 					half4 displacementVector = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
@@ -1230,7 +1058,7 @@
 
 					// Normal Map
 					if (_DisplacementMapType == 0)
-						i.worldPos.xyz += UnpackNormal(displacementVector).xyz*displacementAmount;
+						i.viewPos.xyz += UnpackNormal(displacementVector).xyz*displacementAmount;
 					// Color
 					// Textures are 8 bits per color, so in order to have a '0' distortion value
 					// we need to calculate the origin from 127/255.
@@ -1238,18 +1066,15 @@
 					// Note: This assumes the user has unchecked the 'sRGB (Color Texture)' box
 					//		 for their texture.
 					else
-						i.worldPos.xyz += (displacementVector.xzy - 0.4980392)*displacementAmount;
+						i.viewPos.xyz += (displacementVector.xzy - 0.4980392)*displacementAmount;
 				}
 
 				// Shift world pos back from its current axis-aligned position to
 				// the position it should be in-front of the camera.
-				float4 finishedWorldPos = i.worldPos;
-
-				i.worldPos.xyz = mul(i.inverseViewMatRot, i.worldPos.xyz);
-				i.worldPos.xyz += i.camPos;
+				float4 worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 
 				// Finally acquire our stereo position with which we can sample the screen texture.
-				float4 stereoPosition = computeStereoUV(i.worldPos);
+				float4 stereoPosition = computeStereoUV(worldCoordinates);
 
 				UNITY_BRANCH
 				if (_ColorVectorDisplacementStrength != 0)
@@ -1260,24 +1085,22 @@
 					UNITY_BRANCH
 					if (_ColorVectorDisplacementCoordinateSpace == 0)
 					{
-						finishedWorldPos.xyz += colorDisplacement;
+						i.viewPos.xyz += colorDisplacement;
 
-						// Update world pos to match our new modified world axis position.
-						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
-						i.worldPos.xyz += i.camPos;
+						// Update world pos to match our new modified view-space position.
+						worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 					}
 					// World Space
 					else
 					{
-						i.worldPos.xyz += colorDisplacement;
+						worldCoordinates.xyz -= colorDisplacement;
 
-						// The world axis aligned position (finishedWorldPos) is utilized for some effects like image overlay
-						// and vignette, so we need to propogate the world space displacement backwards.
-						finishedWorldPos.xyz = i.worldPos.xyz - i.camPos;
-						finishedWorldPos.xyz = mul(i.viewMatRot, finishedWorldPos.xyz);
+						// Update view-space pos to match our new modified world position.
+						i.viewPos = mul(UNITY_MATRIX_V, worldCoordinates);
+						i.viewPos.x *= -1;
 					}
 
-					stereoPosition = computeStereoUV(i.worldPos);
+					stereoPosition = computeStereoUV(worldCoordinates);
 				}
 
 				// Requires a directional light to be in the scene so that _CameraDepthTexture is enabled.
@@ -1285,35 +1108,33 @@
 				if (_NormalVectorDisplacementStrength != 0)
 				{
 					float3 normalDisplacement = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
-						i.worldPos, i.camPos, i.camRight, i.camUp, _NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementQuality);
+						worldCoordinates, i.camPos, i.camRight, i.camUp, _NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementQuality);
 
 					normalDisplacement *= _NormalVectorDisplacementStrength;
 
 					// Debug normals
-					//return float4(normalDisplacement, 1);
+					//return float4(normalDisplacement*0.5 + 0.5, 1);
 
 					// View Space
 					UNITY_BRANCH
 					if (_NormalVectorDisplacementCoordinateSpace == 0)
 					{
-						finishedWorldPos.xyz += normalDisplacement;
+						i.viewPos.xyz += normalDisplacement;
 
-						// Update world pos to match our new modified world axis position.
-						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
-						i.worldPos.xyz += i.camPos;
+						// Update world pos to match our new modified view-space position.
+						worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 					}
 					// World Space
 					else
 					{
-						i.worldPos.xyz += normalDisplacement;
+						worldCoordinates.xyz -= normalDisplacement;
 
-						// The world axis aligned position (finishedWorldPos) is utilized for some effects like image overlay
-						// and vignette, so we need to propogate the world space displacement backwards.
-						finishedWorldPos.xyz = i.worldPos.xyz - i.camPos;
-						finishedWorldPos.xyz = mul(i.viewMatRot, finishedWorldPos.xyz);
+						// Update view-space pos to match our new modified world position.
+						i.viewPos = mul(UNITY_MATRIX_V, worldCoordinates);
+						i.viewPos.x *= -1;
 					}
 
-					stereoPosition = computeStereoUV(i.worldPos);
+					stereoPosition = computeStereoUV(worldCoordinates);
 				}
 
 				// Wrap world coordinates after all effects have been applied
@@ -1327,48 +1148,46 @@
 				{
 					if (_WorldSamplingMode == 0)
 					{
-						finishedWorldPos = wrapWorldCoordinates(finishedWorldPos, _WorldSamplingRange);
+						i.viewPos = wrapWorldCoordinates(i.viewPos, _WorldSamplingRange);
 
-						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
-						i.worldPos.xyz += i.camPos;
+						worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 
-						stereoPosition = computeStereoUV(i.worldPos);
+						stereoPosition = computeStereoUV(worldCoordinates);
 					}
 					// Cutout
 					else if (_WorldSamplingMode == 1)
 					{
 						float sampleLimit = _WorldSamplingRange * 100;
-						sampleLimit -= (abs(finishedWorldPos.z - 100) / 100)*sampleLimit;
+						sampleLimit -= (abs(i.viewPos.z - 100) / 100)*sampleLimit;
 						sampleLimit = abs(sampleLimit);
 
-						if (finishedWorldPos.x < -sampleLimit || finishedWorldPos.x > sampleLimit ||
-							finishedWorldPos.y < -sampleLimit || finishedWorldPos.y > sampleLimit)
+						if (i.viewPos.x < -sampleLimit || i.viewPos.x > sampleLimit ||
+							i.viewPos.y < -sampleLimit || i.viewPos.y > sampleLimit)
 							discard;
 					}
 					// Clamp
 					else if (_WorldSamplingMode == 2)
 					{
 						float sampleLimit = _WorldSamplingRange * 100;
-						sampleLimit -= (abs(finishedWorldPos.z - 100) / 100)*sampleLimit;
+						sampleLimit -= (abs(i.viewPos.z - 100) / 100)*sampleLimit;
 						sampleLimit = abs(sampleLimit);
 
-						finishedWorldPos.xy = clamp(finishedWorldPos.xy, -sampleLimit, sampleLimit);
+						i.viewPos.xy = clamp(i.viewPos.xy, -sampleLimit, sampleLimit);
 
 						// Update world pos to match our new modified world axis position.
-						i.worldPos.xyz = mul(i.inverseViewMatRot, finishedWorldPos.xyz);
-						i.worldPos.xyz += i.camPos;
+						worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 
-						stereoPosition = computeStereoUV(i.worldPos);
+						stereoPosition = computeStereoUV(worldCoordinates);
 					}
 					// Empty Space
 					else if (_WorldSamplingMode == 3)
 					{
 						float sampleLimit = _WorldSamplingRange * 100;
-						sampleLimit -= (abs(finishedWorldPos.z - 100) / 100)*sampleLimit;
+						sampleLimit -= (abs(i.viewPos.z - 100) / 100)*sampleLimit;
 						sampleLimit = abs(sampleLimit);
 
-						if (finishedWorldPos.x < -sampleLimit || finishedWorldPos.x > sampleLimit
-							|| finishedWorldPos.y < -sampleLimit || finishedWorldPos.y > sampleLimit)
+						if (i.viewPos.x < -sampleLimit || i.viewPos.x > sampleLimit
+							|| i.viewPos.y < -sampleLimit || i.viewPos.y > sampleLimit)
 						{
 							clearPixel = true;
 						}
@@ -1380,41 +1199,91 @@
 				if (clearPixel && _MemeTexOverrideMode != 2)
 					return half4(_EmptySpaceColor.rgb, _CancerOpacity);
 
+				if (_MaskMapOpacity != 0)
+				{
+					// Toggle between final and starting pos
+					// May need to adjust for sample mode etc
+					float4 samplePosition = _MaskSampleDistortedCoordinates == 1 ? i.viewPos : startingAxisAlignedPos;
+
+					if (_MaskMapAngle != 0)
+						samplePosition.xy = rotate2D(samplePosition.xy, _MaskMapAngle);
+
+					samplePosition.xy *= 1 + _MaskMapScaleWithDistance * distance(i.centerCamPos, i.objPos);
+
+					bool dropMask = false;
+					float cancerMaskValue = 1 - stereoImageOverlay(samplePosition, startingAxisAlignedPos,
+						_MaskMap, _MaskMap_ST, _MaskMap_TexelSize,
+						_MaskMapColumns, _MaskMapRows, _MaskMapCount, _MaskMapIndex,
+						_MaskMapClamp, _MaskMapCutOut,
+						dropMask).r;
+
+					cancerMaskValue *= _MaskMapOpacity;
+
+					if (dropMask)
+						cancerMaskValue = 1;
+
+					// Hijack falloff to apply the mask without additional work
+					i.colorDistortionFalloff -= i.colorDistortionFalloff*float2(cancerMaskValue * ((_MaskFlags & 1) != 0), cancerMaskValue * ((_MaskFlags & 2) != 0));
+					i.colorDistortionFalloff = clamp(i.colorDistortionFalloff, 0, 1);
+				}
+
 				// Apply falloff to distortion
 				if (i.colorDistortionFalloff.y < 1)
 				{
-					finishedWorldPos.xyz = lerp(startingAxisAlignedPos.xyz, finishedWorldPos.xyz, i.colorDistortionFalloff.y);
+					i.viewPos.xyz = lerp(startingAxisAlignedPos.xyz, i.viewPos.xyz, i.colorDistortionFalloff.y);
 
-					i.worldPos = lerp(startingWorldPos, i.worldPos, i.colorDistortionFalloff.y);
-					stereoPosition = computeStereoUV(i.worldPos);
+					worldCoordinates = lerp(startingWorldPos, worldCoordinates, i.colorDistortionFalloff.y);
+					stereoPosition = computeStereoUV(worldCoordinates);
 				}
 
-				// Undo the cancer effect offset, rotation, and quantization for ONLY the screen sample coordinates
+				// Undo the camera roll removal, cancer effect offset, rotation, and quantization for ONLY the screen sample coordinates
 				// This allows for moving effects around without affecting the screen.
 				// Ex. Meme spotlight movement via Vignette 
-				float4 originalFinishedWorldPos = finishedWorldPos;
-				UNITY_BRANCH
-				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0)
-				{
-					finishedWorldPos.xyz -= _CancerEffectOffset.xyz;
-					finishedWorldPos.xy = rotate2D(finishedWorldPos.xy, -_CancerEffectRotation);
+				float4 originalViewPos = i.viewPos;
 
-					float4 temp = float4(mul(i.inverseViewMatRot, finishedWorldPos.xyz), 1);
-					temp.xyz += i.camPos;
+				UNITY_BRANCH
+				if (_RemoveCameraRoll)
+				{
+					i.viewPos.xy = rotate2D(i.viewPos.xy, -cameraRollAngle);
+
+					float4 temp = computeWorldPositionFromAxisPosition(i.viewPos);
+					stereoPosition = computeStereoUV(temp);
+				}
+
+				UNITY_BRANCH
+				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0 || any(_CancerEffectRange != 1.f))
+				{
+					i.viewPos.xyz -= cancerEffectWrapVector;
+
+					i.viewPos.xyz -= _CancerEffectOffset.xyz;
+					i.viewPos.xy = rotate2D(i.viewPos.xy, -_CancerEffectRotation);
+
+					float4 temp = computeWorldPositionFromAxisPosition(i.viewPos);
 					stereoPosition = computeStereoUV(temp);
 				}
 
 				UNITY_BRANCH
 				if (_CancerEffectQuantization != 0)
 				{
-					finishedWorldPos.xyz -= cancerEffectQuantizationVector;
+					i.viewPos.xyz -= cancerEffectQuantizationVector;
 
-					float4 temp = float4(mul(i.inverseViewMatRot, finishedWorldPos.xyz), 1);
-					temp.xyz += i.camPos;
+					float4 temp = computeWorldPositionFromAxisPosition(i.viewPos);
 					stereoPosition = computeStereoUV(temp);
 				}
 
-				finishedWorldPos = originalFinishedWorldPos;
+				// Centered On Object coordinate space
+				UNITY_BRANCH
+				if (_CoordinateSpace == 2)
+				{
+					i.viewPos.xy += i.screenSpaceObjPos.xy*_CoordinateScale;
+
+					worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
+					stereoPosition = computeStereoUV(worldCoordinates);
+
+					i.camFront = normalize(i.objPos - i.centerCamPos);
+				}
+
+				i.viewPos = originalViewPos;
 
 				// Default UV clamping works for desktop, but for VR
 				// we may want to constrain UV coordinates to
@@ -1426,8 +1295,8 @@
 				// Wrapping allows for creating 'infinite' texture
 				// and tunnel effects.
 				UNITY_BRANCH
-					if (_ScreenSamplingMode == 2)
-						stereoPosition = wrapUVCoordinates(stereoPosition);
+				if (_ScreenSamplingMode == 2)
+					stereoPosition = wrapUVCoordinates(stereoPosition);
 
 				  /////////////////////////
 				 // Apply Color Effects //
@@ -1440,13 +1309,27 @@
 				UNITY_BRANCH
 				if (_colorSkewROverride == 0 || _colorSkewGOverride == 0 || _colorSkewBOverride == 0)
 				{
-					if (_ChromaticAbberationStrength != 0)
-						bgcolor += chromaticAbberation(_stereoCancerTexture, i.worldPos, i.camFront, _ChromaticAbberationStrength, _ChromaticAbberationSeparation, _ChromaticAbberationShape);
-					else if (_BlurMovementOpacity != 0)
-						bgcolor.rgb += blurMovement(_stereoCancerTexture, startingWorldPos, i.worldPos, _BlurMovementSampleCount,
+					bgcolor = tex2Dproj(_stereoCancerTexture, stereoPosition);
+
+					UNITY_BRANCH
+					if (_ChromaticAberrationBlend != 0 && _ChromaticAberrationStrength != 0)
+					{
+						half3 chromaticColor = chromaticAberration(_stereoCancerTexture, worldCoordinates, i.camFront, _ChromaticAberrationStrength, _ChromaticAberrationSeparation, _ChromaticAberrationShape);
+						bgcolor.rgb = lerp(bgcolor.rgb, chromaticColor, _ChromaticAberrationBlend);
+					}
+					UNITY_BRANCH
+					if (_BlurMovementBlend != 0 && _BlurMovementOpacity != 0)
+					{
+						half3 blurColor = blurMovement(_stereoCancerTexture, startingWorldPos, worldCoordinates, _BlurMovementSampleCount,
 							_BlurMovementTarget, _BlurMovementRange, _BlurMovementExtrapolation, _BlurMovementOpacity);
-					else
-						bgcolor += tex2Dproj(_stereoCancerTexture, stereoPosition);
+						bgcolor.rgb = lerp(bgcolor.rgb, blurColor, _BlurMovementBlend);
+					}
+					UNITY_BRANCH
+					if (_DistortionDesyncBlend != 0 && any(float3(_DistortionDesyncR, _DistortionDesyncG, _DistortionDesyncB)))
+					{
+						half3 rgbColor = rgbColorDesync(_stereoCancerTexture, startingWorldPos, worldCoordinates, _DistortionDesyncR, _DistortionDesyncG, _DistortionDesyncB);
+						bgcolor.rgb = lerp(bgcolor.rgb, rgbColor, _DistortionDesyncBlend);
+					}
 
 					// Ensure pure black is not captured, which ruins image blending and other effects
 					// such as value adjustment
@@ -1458,7 +1341,7 @@
 				UNITY_BRANCH
 				if (_PaletteOpacity != 0)
 				{
-					float3 palleteWorldPos = worldPosFromDepth(_CameraDepthTexture, computeStereoUV(i.worldPos), i.camPos, i.worldPos);
+					float3 palleteWorldPos = worldPosFromDepth(_CameraDepthTexture, computeStereoUV(worldCoordinates), i.camPos, worldCoordinates);
 					half3 paletteColor = palletization(palleteWorldPos, bgcolor, _PalleteSource, _PaletteScale, _PaletteOffset, _PaletteA, _PaletteB, _PaletteOscillation, _PalettePhase);
 					
 					bgcolor.rgb = lerp(bgcolor.rgb, paletteColor, _PaletteOpacity);
@@ -1483,15 +1366,15 @@
 					half3 triplanarColor = half3(0, 0, 0);
 
 					float3 normal = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
-						i.worldPos, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, _TriplanarQuality);
+						worldCoordinates, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, _TriplanarQuality);
 
 					// Sample map
 					if (_TriplanarSampleSrc == 0)
-						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, finishedWorldPos,
+						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
 							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 1, false);
 					// Sample screen, UV range is reduced to the range (0.2, 0.8) to hide the VR mask.
 					else
-						triplanarColor = stereoTriplanarMappping(_stereoCancerTexture, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, i.worldPos, finishedWorldPos,
+						triplanarColor = stereoTriplanarMappping(_stereoCancerTexture, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
 							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 0.6, true);
 
 					triplanarColor *= _TriplanarOpacity;
@@ -1509,17 +1392,23 @@
 
 				UNITY_BRANCH
 				if (_SignalNoiseSize != 0 && _SignalNoiseOpacity != 0)
-					bgcolor.rgb += signalNoise(finishedWorldPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
+					bgcolor.rgb += signalNoise(i.viewPos, _SignalNoiseSize, _ColorizedSignalNoise, _SignalNoiseOpacity);
 
 				UNITY_BRANCH
 				if (_FogType != 0)
 				{
-					float4 fogWorldPosition = finishedWorldPos;
+					float4 fogWorldPosition = i.viewPos;
 
 					// Fog requires projected coordinates, so if the user isn't using them
 					// then we need to project the coordinates ourself.
-					if (_CoordinateSpace != 1)
-						fogWorldPosition = projectCoordinates(_CameraDepthTexture, i.inverseViewMatRot, finishedWorldPos, i.camPos, normalize(finishedWorldPos));
+					if (_CoordinateSpace == 0)
+						fogWorldPosition = projectCoordinates(_CameraDepthTexture, fogWorldPosition, i.camPos, fogWorldPosition);
+					// Center On Object, doesn't support mirrors. Will be black.
+					else if(_CoordinateSpace == 2)
+					{
+						fogWorldPosition.xyz = worldPosFromDepth(_CameraDepthTexture, stereoPosition, i.camPos, worldCoordinates);
+						fogWorldPosition.xyz -= i.objPos;
+					}
 
 					bgcolor.rgb = fog(bgcolor.rgb, fogWorldPosition, _FogType, _FogColor, _FogBegin, _FogEnd);
 				}
@@ -1527,16 +1416,18 @@
 				UNITY_BRANCH
 				if (_EdgelordStripeSize != 0)
 				{
-					float2 edgelordUV = (stereoPosition.xyz / stereoPosition.w).xy;
+					float2 edgelordUV = (i.viewPos.xyz / i.viewPos.w).xy;
 					bgcolor = edgelordStripes(edgelordUV, bgcolor, _EdgelordStripeColor, _EdgelordStripeSize, _EdgelordStripeOffset);
 				}
 
 				UNITY_BRANCH
 				if(_MemeTexOpacity != 0)
 				{
-					float4 samplePosition = finishedWorldPos;
+					float4 samplePosition = i.viewPos;
 					if (_MemeImageAngle != 0)
 						samplePosition.xy = rotate2D(samplePosition.xy, _MemeImageAngle);
+
+					samplePosition.xy *= 1 + _MemeImageScaleWithDistance*distance(i.centerCamPos, i.objPos);
 
 					bool dropMemePixels = false;
 					half4 memeColor = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
@@ -1583,12 +1474,16 @@
 
 				UNITY_BRANCH
 				if (_CircularVignetteOpacity != 0)
-					bgcolor.rgb = circularVignette(bgcolor, finishedWorldPos, _CircularVignetteColor, _CircularVignetteOpacity,
-						_CircularVignetteRoundness,_CircularVignetteMode,_CircularVignetteBegin, _CircularVignetteEnd);
+				{
+					float4 samplePos = _CircularVignetteScaleWithDistance == 1 ? i.viewPos * distance(i.centerCamPos, i.objPos) : i.viewPos;
+
+					bgcolor.rgb = circularVignette(bgcolor, samplePos, _CircularVignetteColor, _CircularVignetteOpacity,
+						_CircularVignetteRoundness, _CircularVignetteMode, _CircularVignetteBegin, _CircularVignetteEnd);
+				}
 
 				UNITY_BRANCH
 				if (_Hue != 0 || _Saturation != 0 || _Value != 0)
-					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value);
+					bgcolor.rgb = applyHSV(bgcolor, _Hue, _Saturation, _Value, _ClampSaturation);
 
 				UNITY_BRANCH
 				if (_ImaginaryColorOpacity != 0)
@@ -1606,7 +1501,7 @@
 				UNITY_BRANCH
 				if (_SobelOpacity != 0)
 				{
-					float sobelMagnitude = sobelFilter(_stereoCancerTexture, i.camRight, i.camUp, i.worldPos, _SobelSearchDistance, _SobelQuality)*_SobelOpacity;
+					float sobelMagnitude = sobelFilter(_stereoCancerTexture, i.camRight, i.camUp, worldCoordinates, _SobelSearchDistance, _SobelQuality)*_SobelOpacity;
 
 					// None, aka Overwrite
 					if (_SobelBlendMode == 0)
@@ -1624,7 +1519,7 @@
 				UNITY_BRANCH
 				if (_colorSkewROpacity != 0 || _colorSkewROverride != 0)
 				{
-					float redColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewRAngle, _colorSkewRDistance,
+					float redColor = colorShift(_stereoCancerTexture, _colorSkewRAngle, _colorSkewRDistance,
 						_colorSkewROpacity, stereoPosition).r;
 
 					if (_colorSkewROverride != 0)
@@ -1635,7 +1530,7 @@
 				UNITY_BRANCH
 				if (_colorSkewGOpacity != 0 || _colorSkewGOverride != 0)
 				{
-					float greenColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewGAngle, _colorSkewGDistance,
+					float greenColor = colorShift(_stereoCancerTexture, _colorSkewGAngle, _colorSkewGDistance,
 						_colorSkewGOpacity, stereoPosition).g;
 
 					if (_colorSkewGOverride != 0)
@@ -1646,7 +1541,7 @@
 				UNITY_BRANCH
 				if (_colorSkewBOpacity != 0 || _colorSkewBOverride != 0)
 				{
-					float blueColor = colorShift(_stereoCancerTexture, i.camFront, i.camRight, _colorSkewBAngle, _colorSkewBDistance,
+					float blueColor = colorShift(_stereoCancerTexture, _colorSkewBAngle, _colorSkewBDistance,
 						_colorSkewBOpacity, stereoPosition).b;
 
 					if (_colorSkewBOverride != 0)

@@ -22,9 +22,11 @@ public class StereoCancerGUI : ShaderGUI
     // Main parameter category foldout states
     bool displayLayerParameters = false;
     bool displayRenderParameters = false;
+    bool displayStencilParameters = false;
     bool displayBlendingParameters = false;
     bool displayVRParameters = false;
     bool displayImageOverlayParameters = false;
+    bool displayMaskMapParameters = false;
     bool displayDisplacementMapParameters = false;
     bool displayTriplanarMapParameters = false;
     bool displayDistortionParameters = false;
@@ -68,6 +70,7 @@ public class StereoCancerGUI : ShaderGUI
     bool displaySignalNoise = false;
     bool displayBlurMovement = false;
     bool displayChromaticAberration = false;
+    bool displayRGBDistortionDesync = false;
     bool displayCircularVignette = false;
     bool displayFog = false;
     bool displayEdgelordStriples = false;
@@ -82,6 +85,18 @@ public class StereoCancerGUI : ShaderGUI
     // End color effect foldout states
 
     // Begin wall of parameter madness
+    MaterialProperty _CullMode = null;
+    MaterialProperty _ZWrite = null;
+    MaterialProperty _ZTest = null;
+
+    MaterialProperty _StencilRef = null;
+    MaterialProperty _StencilComp = null;
+    MaterialProperty _StencilOp = null;
+    MaterialProperty _StencilFail = null;
+    MaterialProperty _StencilZFail = null;
+    MaterialProperty _ReadMask = null;
+    MaterialProperty _WriteMask = null;
+
     MaterialProperty _ParticleSystem = null;
     MaterialProperty _CoordinateSpace = null;
     MaterialProperty _CoordinateScale = null;
@@ -90,10 +105,15 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CancerEffectQuantization = null;
     MaterialProperty _CancerEffectRotation = null;
     MaterialProperty _CancerEffectOffset = null;
+    MaterialProperty _CancerEffectRange = null;
+    MaterialProperty _RemoveCameraRoll = null;
     MaterialProperty _Visibility = null;
     MaterialProperty _FalloffEnabled = null;
     MaterialProperty _FalloffFlags = null;
     MaterialProperty _FalloffBeginPercentage = null;
+    MaterialProperty _FalloffEndPercentage = null;
+    MaterialProperty _FalloffAngleBegin = null;
+    MaterialProperty _FalloffAngleEnd = null;
 
     // Image Overlay params
     MaterialProperty _MemeTex = null;
@@ -109,6 +129,7 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _MemeTexCutOut = null;
     MaterialProperty _MemeTexAlphaCutOff = null;
     MaterialProperty _MemeTexOverrideMode = null;
+    MaterialProperty _MemeImageScaleWithDistance = null;
 
     MaterialProperty _stereoCancerTexture = null;
     MaterialProperty _stereoCancerTexture_TexelSize = null;
@@ -119,6 +140,22 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CancerOpacity = null;
     MaterialProperty _SrcFactor = null;
     MaterialProperty _DstFactor = null;
+
+    // Mask Map params
+    MaterialProperty _MaskMap = null;
+    MaterialProperty _MaskMap_TexelSize = null;
+    MaterialProperty _MaskMap_ST = null;
+    MaterialProperty _MaskMapColumns = null;
+    MaterialProperty _MaskMapRows = null;
+    MaterialProperty _MaskMapCount = null;
+    MaterialProperty _MaskMapIndex = null;
+    MaterialProperty _MaskMapAngle = null;
+    MaterialProperty _MaskMapOpacity = null;
+    MaterialProperty _MaskMapClamp = null;
+    MaterialProperty _MaskMapCutOut = null;
+    MaterialProperty _MaskFlags = null;
+    MaterialProperty _MaskMapScaleWithDistance = null;
+    MaterialProperty _MaskSampleDistortedCoordinates = null;
 
     // Displacement Map params
     MaterialProperty _DisplacementMap = null;
@@ -133,6 +170,7 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _DisplacementMapIntensity = null;
     MaterialProperty _DisplacementMapClamp = null;
     MaterialProperty _DisplacementMapCutOut = null;
+    MaterialProperty _DisplacementMapScaleWithDistance = null;
 
     // Triplanar params
     MaterialProperty _TriplanarMap = null;
@@ -344,6 +382,7 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _Hue = null;
     MaterialProperty _Saturation = null;
     MaterialProperty _Value = null;
+    MaterialProperty _ClampSaturation = null;
 
     MaterialProperty _ImaginaryColorBlendMode = null;
     MaterialProperty _ImaginaryColorOpacity = null;
@@ -354,10 +393,17 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _BlurMovementRange = null;
     MaterialProperty _BlurMovementExtrapolation = null;
     MaterialProperty _BlurMovementOpacity = null;
+    MaterialProperty _BlurMovementBlend = null;
 
-    MaterialProperty _ChromaticAbberationStrength = null;
-    MaterialProperty _ChromaticAbberationSeparation = null;
-    MaterialProperty _ChromaticAbberationShape = null;
+    MaterialProperty _ChromaticAberrationStrength = null;
+    MaterialProperty _ChromaticAberrationSeparation = null;
+    MaterialProperty _ChromaticAberrationShape = null;
+    MaterialProperty _ChromaticAberrationBlend = null;
+
+    MaterialProperty _DistortionDesyncR = null;
+    MaterialProperty _DistortionDesyncG = null;
+    MaterialProperty _DistortionDesyncB = null;
+    MaterialProperty _DistortionDesyncBlend = null;
 
     MaterialProperty _SignalNoiseSize = null;
     MaterialProperty _ColorizedSignalNoise = null;
@@ -369,6 +415,7 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CircularVignetteMode = null;
     MaterialProperty _CircularVignetteBegin = null;
     MaterialProperty _CircularVignetteEnd = null;
+    MaterialProperty _CircularVignetteScaleWithDistance = null;
 
     MaterialProperty _SobelSearchDistance = null;
     MaterialProperty _SobelQuality = null;
@@ -391,6 +438,8 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _colorSkewBOverride = null;
     
     MaterialProperty _CancerDisplayMode = null;
+    MaterialProperty _ObjectDisplayMode = null;
+    MaterialProperty _DisplayOnSurface = null;
     MaterialProperty _ScreenSamplingMode = null;
 
     // End wall of parameter madness
@@ -420,8 +469,10 @@ public class StereoCancerGUI : ShaderGUI
 
             drawLayerParameters(materialEditor, material, properties);
             drawRenderParameters(materialEditor, properties);
+            drawStencilParameters(materialEditor, properties);
             drawBlendingParamters(materialEditor, properties);
             drawOverlayParameters(materialEditor, properties);
+            drawMaskParameters(materialEditor, properties);
             drawDisplacementParameters(materialEditor, properties);
             drawTriplanarParameters(materialEditor, properties);
             drawVRParamters(materialEditor, properties);
@@ -485,6 +536,15 @@ public class StereoCancerGUI : ShaderGUI
                     string outputLocation = shaderPath + internalGrabPassName + ".shader";
                     shaderPath += ".shader";
 
+                    string customShaderName = "Shader \"xwidghet/StereoCancer v0.1" + internalGrabPassName + "\"\n";
+
+                    int customRenderQueue = material.renderQueue - 4000;
+                    string renderQueueString = "\"Overlay\"";
+                    if (customRenderQueue != 0)
+                    {
+                        renderQueueString = String.Format("\"Overlay{0}\"", customRenderQueue.ToString("+#;-#;0"));
+                    }
+
                     if (File.Exists(outputLocation))
                     {
                         Debug.LogError("A layer with this name was already created. Please choose a new name.");
@@ -495,24 +555,23 @@ public class StereoCancerGUI : ShaderGUI
                         {
                             using (StreamWriter sw = new StreamWriter(outputLocation))
                             {
-                                using (StreamReader sr = new StreamReader(shaderPath))
-                                {
-                                    string line;
-                                    while ((line = sr.ReadLine()) != null)
-                                    {
-                                        if (line.Contains("Shader \"xwidghet/"))
-                                        {
-                                            line = "Shader \"xwidghet/StereoCancer v0.1" + internalGrabPassName + "\"";
-                                        }
-                                        else
-                                        {
-                                            line = line.Replace("_stereoCancerTexture", internalGrabPassName);
-                                        }
+                                string[] shaderFileText = File.ReadAllLines(shaderPath);
+                                StringBuilder shaderStringBuilder = new StringBuilder("// UNITY_SHADER_NO_UPGRADE\n\n" + customShaderName);
 
-                                        sw.Write(line);
-                                        sw.WriteLine();
+                                // Skip past old name line
+                                for (int i = 3; i < shaderFileText.Length; i++)
+                                {
+                                    if(shaderFileText[i].Contains("\"Overlay\""))
+                                    {
+                                        shaderStringBuilder.AppendLine(shaderFileText[i].Replace("\"Overlay\"", renderQueueString));
+                                    }
+                                    else
+                                    {
+                                        shaderStringBuilder.AppendLine(shaderFileText[i].Replace("_stereoCancerTexture", internalGrabPassName));
                                     }
                                 }
+
+                                sw.Write(shaderStringBuilder.ToString());
                             }
 
                             AssetDatabase.Refresh();
@@ -540,27 +599,65 @@ public class StereoCancerGUI : ShaderGUI
         if(displayRenderParameters == true)
         {
             EditorGUI.indentLevel = 1;
+            materialEditor.ShaderProperty(_CullMode, new GUIContent("Cull Mode", "Select if the vertices should be culled. This should be set to Front for fullscreen Object Display Mode, and off for world scale."));
+            materialEditor.ShaderProperty(_ZWrite, new GUIContent("Z Write", "Select if the depth should be written to the depth buffer. This should be off for fullscreen Object Display Mode, and on for world scale."));
+            materialEditor.ShaderProperty(_ZTest, new GUIContent("Z Test", "Select if pixels from this object should be discarded when an object is closer than the pixel. This should be set to Always for fullscreen Object Display Mode, and LessEqual for world scale."));
+            GUILayout.Space(20);
+
             materialEditor.ShaderProperty(_CancerDisplayMode, new GUIContent("Cancer Display Mode", "Select if cancer effects should be selectively displayed on the screen, mirrors, or both."));
-            materialEditor.ShaderProperty(_ScreenSamplingMode, new GUIContent("Screen Sampling Mode", "Select how the screen texture is sampled when pixels go outside of the screen/eye."));
-            materialEditor.ShaderProperty(_CoordinateSpace, new GUIContent("Coordinate Space", "Select if the cancer coordinates should be a flat 'Screen' plane, or 'Projected' onto the scene like a flashlight."));
+            materialEditor.ShaderProperty(_ObjectDisplayMode, new GUIContent("Object Display Mode", "Select if cancer object should fully cover the viewers screen, or displayed in the world like a normal object."));
+            materialEditor.ShaderProperty(_DisplayOnSurface, new GUIContent("Display On Surface", "Select if the cancer effects should be displayed on the surface of the object like a texture."));
+            materialEditor.ShaderProperty(_CoordinateSpace, new GUIContent("Coordinate Space", "Select if the cancer coordinates should be a flat 'Screen' plane, 'Projected' onto the scene like a flashlight, 'Centered On Object'."));
             materialEditor.ShaderProperty(_CoordinateScale, new GUIContent("Coordinate Scale", "Adjust the scale of the screen-space cancer coordinates. Useful for adjusting 'Projected' coordinates and making final adjustments to animations."));
+            materialEditor.ShaderProperty(_ScreenSamplingMode, new GUIContent("Screen Sampling Mode", "Select how the screen texture is sampled when pixels go outside of the screen/eye."));
             materialEditor.ShaderProperty(_WorldSamplingMode, new GUIContent("World Sampling Mode", "Select how the screen texture is sampled when the coordinates exit the World Sampling Range."));
             materialEditor.ShaderProperty(_WorldSamplingRange, new GUIContent("World Sampling Range", "Adjust the cancer coordinate sampling range used for the currently selected 'World Sampling Mode'."));
+
+            GUILayout.Space(20);
+            materialEditor.ShaderProperty(_RemoveCameraRoll, new GUIContent("Remove Camera Roll", "Select if camera roll should be removed from cancer effects."));
             materialEditor.ShaderProperty(_CancerEffectQuantization, new GUIContent("Cancer Effect Quantization", "Adjust the quantization of the cancer effects separately from the quantization of the screen."));
             materialEditor.ShaderProperty(_CancerEffectRotation, new GUIContent("Cancer Effect Rotation", "Adjust the rotation of the cancer effects separately from the rotation of the screen."));
             materialEditor.ShaderProperty(_CancerEffectOffset, new GUIContent("Cancer Effect Offset", "Adjust the movement of the cancer effects separately from the movement of the screen."));
-            materialEditor.ShaderProperty(_Visibility, new GUIContent("Visibility", "Select which users should see the cancer effects. Settings other than 'Global' require that the object containing the StereoCancer material is parented to your avatar's head, and has a scale of 10,000 or greater."));
+           
+            // Remove spacing after vector UI display so all cancer coordinate parameters are kept together
+            GUILayout.Space(-16);
+            materialEditor.ShaderProperty(_CancerEffectRange, new GUIContent("Cancer Effect Range", "Adjust the wrapping of the cancer effects separately from the wrapping of the screen."));
 
+
+            GUILayout.Space(20);
             materialEditor.ShaderProperty(_FalloffEnabled, new GUIContent("Falloff Enabled", "Enable or disable falloff. Note: Falloff requires that all of the object scale axes are positive."));
             if(_FalloffEnabled.floatValue != 0)
             {
                 materialEditor.ShaderProperty(_FalloffFlags, new GUIContent("Falloff Flags", "Select if only opacity or distortion should falloff, or if both should be affected simultaneously."));
-                materialEditor.ShaderProperty(_FalloffBeginPercentage, new GUIContent("Falloff Begin Percentage", "The percentage of the object scale that the falloff begins at."));
+                materialEditor.ShaderProperty(_FalloffBeginPercentage, new GUIContent("Falloff Begin Distance", "The percentage of the object scale that the falloff begins at. This should be a value between 0 and 1 for fullscreen Object Display Mode."));
+                materialEditor.ShaderProperty(_FalloffEndPercentage, new GUIContent("Falloff End Distance", "The percentage of the object scale that the falloff ends at. This should be a value between 0 and 1 for fullscreen Object Display Mode."));
 
+                materialEditor.ShaderProperty(_FalloffAngleBegin, new GUIContent("Falloff Begin Angle", "The percentage falloff begins as the viewer looks away from the object. Set to 1 to disable angle falloff."));
+                materialEditor.ShaderProperty(_FalloffAngleEnd, new GUIContent("Falloff End Angle", "The percentage falloff ends as the viewer looks away from the object."));
             }
 
             GUILayout.Space(20);
+            materialEditor.ShaderProperty(_Visibility, new GUIContent("Visibility", "Select which users should see the cancer effects. Settings other than 'Global' require that the object containing the StereoCancer material is parented to your avatar's head, and has a scale of 10,000 or greater."));
             materialEditor.ShaderProperty(_ParticleSystem, new GUIContent("Particle System", "Select 'Yes' when the material is on a particle."));
+
+            EditorGUI.indentLevel = 0;
+        }
+    }
+
+    public void drawStencilParameters(MaterialEditor materialEditor, MaterialProperty[] properties)
+    {
+        displayStencilParameters = EditorGUILayout.Foldout(displayStencilParameters, "Stencil Parameters", true, scFoldoutStyle);
+
+        if (displayStencilParameters == true)
+        {
+            EditorGUI.indentLevel = 1;
+            materialEditor.ShaderProperty(_StencilRef, new GUIContent("Stencil Reference", "The target stencil value to compare against."));
+            materialEditor.ShaderProperty(_StencilComp, new GUIContent("Stencil Comparison", "The comparison function to be used when comparing the reference value against the stencil buffer."));
+            materialEditor.ShaderProperty(_StencilOp, new GUIContent("Stencil Operation", "The operation to apply to the stencil buffer if the stencil comparison passes."));
+            materialEditor.ShaderProperty(_StencilFail, new GUIContent("Stencil Fail", "The operation to apply to the stencil buffer if the stencil comparison fails."));
+            materialEditor.ShaderProperty(_StencilZFail, new GUIContent("Stencil ZFail", "The operation to apply to the stencil buffer when the stencil comparison is successful but Z-Test fails."));
+            materialEditor.ShaderProperty(_ReadMask, new GUIContent("Read Mask", "The bitwise mask to apply against the stencil buffer before doing the stencil comparison. If you don't know what this means, you probably want 255."));
+            materialEditor.ShaderProperty(_WriteMask, new GUIContent("Write Mask", "The bitwise mask used to determine which stencil bits are written to the stencil buffer. If you don't know what this means, you probably want 255."));
 
             EditorGUI.indentLevel = 0;
         }
@@ -587,7 +684,7 @@ public class StereoCancerGUI : ShaderGUI
 
         if (displayVRParameters == true)
         {
-            materialEditor.ShaderProperty(_EyeConvergence, new GUIContent("Eye Convergence", "Adjust the viewer's eye convergence, positive values will result in the viewer going cross-eyed."));
+            materialEditor.ShaderProperty(_EyeConvergence, new GUIContent("Eye Convergence", "Adjust the viewer's eye convergence. Positive values will result in the viewer going cross-eyed."));
             materialEditor.ShaderProperty(_EyeSeparation, new GUIContent("Eye Separation", "Adjust the separation distance between the viewer's eyes."));
         }
     }
@@ -612,6 +709,36 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_MemeTexAlphaCutOff, new GUIContent("Image Alpha Cutoff", "Adjust the minimum alpha value used to determine if the pixels should be discarded."));
             materialEditor.ShaderProperty(_MemeTexOverrideMode, new GUIContent("Image Override Mode", "Select 'None' to overlay the image on-top of cancer effects, 'Background' if the overlay should replace the screen color, and 'Empty Space' to fill in only the space created by effects like 'Screen Split'."));
 
+            GUILayout.Space(20);
+            materialEditor.ShaderProperty(_MemeImageScaleWithDistance, new GUIContent("Image Scale With Distance", "Select if the image should be scaled with distance. Recommended when using coordinate space Centered On Object."));
+
+            EditorGUI.indentLevel = 0;
+        }
+    }
+
+    public void drawMaskParameters(MaterialEditor materialEditor, MaterialProperty[] properties)
+    {
+        displayMaskMapParameters = EditorGUILayout.Foldout(displayMaskMapParameters, "Mask Map", true, scFoldoutStyle);
+
+        if (displayMaskMapParameters == true)
+        {
+            materialEditor.ShaderProperty(_MaskMap, new GUIContent("", "Select the texture to use as a mask map."));
+
+            EditorGUI.indentLevel = 1;
+            materialEditor.ShaderProperty(_MaskMapColumns, new GUIContent("Mask Map Columns", "The number of images packed into the texture horizontally."));
+            materialEditor.ShaderProperty(_MaskMapRows, new GUIContent("Mask Map Rows", "The number of images packed into the texture vertically."));
+            materialEditor.ShaderProperty(_MaskMapCount, new GUIContent("Mask Map Count", "The total number of images packed into the texture. Allows for the index to loop seemlessly when not all of the image spaces have been filled."));
+            materialEditor.ShaderProperty(_MaskMapIndex, new GUIContent("Mask Map Index", "The current index of the image in the potentially packed texture."));
+            materialEditor.ShaderProperty(_MaskMapAngle, new GUIContent("Mask Map Angle", "Adjust the rotation of the mask map."));
+            materialEditor.ShaderProperty(_MaskMapOpacity, new GUIContent("Mask Map Opacity", "Adjust the opacity of the mask map."));
+            materialEditor.ShaderProperty(_MaskMapClamp, new GUIContent("Mask Map Clamp", "Select 'Yes' if the mask map should be clamped to the edge pixels."));
+            materialEditor.ShaderProperty(_MaskMapCutOut, new GUIContent("Mask Map Cutout", "Select 'Yes' if the mask map should be cutout."));
+
+            GUILayout.Space(20);
+            materialEditor.ShaderProperty(_MaskFlags, new GUIContent("Mask Flags", "Select if only opacity or distortion should be masked, or if both should be masked simultaneously."));
+            materialEditor.ShaderProperty(_MaskMapScaleWithDistance, new GUIContent("Mask Map Scale With Distance", "Select if the mask map should be scaled with distance. Recommended when using coordinate space Centered On Object."));
+            materialEditor.ShaderProperty(_MaskSampleDistortedCoordinates, new GUIContent("Mask Map Sample Distortion", "Select 'Yes' if the mask map should be distorted."));
+
             EditorGUI.indentLevel = 0;
         }
     }
@@ -631,9 +758,12 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_DisplacementMapCount, new GUIContent("Displacement Map Count", "The total number of images packed into the texture. Allows for the index to loop seemlessly when not all of the image spaces have been filled."));
             materialEditor.ShaderProperty(_DisplacementMapIndex, new GUIContent("Displacement Map Index", "The current index of the image in the potentially packed texture."));
             materialEditor.ShaderProperty(_DisplacementMapAngle, new GUIContent("Displacement Map Angle", "Adjust the rotation of the displacement map."));
-            materialEditor.ShaderProperty(_DisplacementMapIntensity, new GUIContent("Displacement Map Intensity", "Adjust the intensity of the displacement map."));
+            materialEditor.ShaderProperty(_DisplacementMapIntensity, new GUIContent("Displacement Map Distance", "Adjust the maximum distance of the displacement map."));
             materialEditor.ShaderProperty(_DisplacementMapClamp, new GUIContent("Displacement Map Clamp", "Select 'Yes' if the displacement map should be clamped to the edge pixels."));
             materialEditor.ShaderProperty(_DisplacementMapCutOut, new GUIContent("Displacement Map Cutout", "Select 'Yes' if the displacement map should be cutout."));
+
+            GUILayout.Space(20);
+            materialEditor.ShaderProperty(_DisplacementMapScaleWithDistance, new GUIContent("Displacement Map Scale With Distance", "Select if the displacement map should be scaled with distance. Recommended when using coordinate space Centered On Object."));
 
             EditorGUI.indentLevel = 0;
         }
@@ -727,12 +857,14 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionSkew)
             {
                 materialEditor.ShaderProperty(_SkewXAngle, new GUIContent("Horizontal Skew Angle", "Adjust the angle of the horizontal screen skew."));
-                materialEditor.ShaderProperty(_SkewXDistance, new GUIContent("Horizontal Skew Distance", "Adjust the skewing distance."));
                 materialEditor.ShaderProperty(_SkewXInterval, new GUIContent("Horizontal Skew Interval", "Adjust how often the skew flips from positive to negative values."));
+                materialEditor.ShaderProperty(_SkewXDistance, new GUIContent("Horizontal Skew Distance", "Adjust the skewing distance."));
+                materialEditor.ShaderProperty(_SkewXOffset, new GUIContent("Horizontal Skew Offset", "Adjust the offset of the horizontal skew."));
                 GUILayout.Space(20);
                 materialEditor.ShaderProperty(_SkewYAngle, new GUIContent("Vertical Skew Angle", "Adjust the angle of the vertical screen skew."));
-                materialEditor.ShaderProperty(_SkewYDistance, new GUIContent("Vertical Skew Distance", "Adjust the skewing distance."));
                 materialEditor.ShaderProperty(_SkewYInterval, new GUIContent("Vertical Skew Interval", "Adjust how often the skew flips from positive to negative values."));
+                materialEditor.ShaderProperty(_SkewYDistance, new GUIContent("Vertical Skew Distance", "Adjust the skewing distance."));
+                materialEditor.ShaderProperty(_SkewYOffset, new GUIContent("Vertical Skew Offset", "Adjust the offset of the vertical skew."));
             }
 
             displayDistortionBar = EditorGUILayout.Foldout(displayDistortionBar, "Alternating Bar Shift", true, scFoldoutStyle);
@@ -740,13 +872,13 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionBar)
             {
                 materialEditor.ShaderProperty(_BarXAngle, new GUIContent("Horizontal Bar Shift Angle", "Adjust the angle of the horizontal screen bars."));
-                materialEditor.ShaderProperty(_BarXDistance, new GUIContent("Horizontal Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_BarXInterval, new GUIContent("Horizontal Bar Shift Interval", "Adjust how often the bars alternate from positive to negative values."));
+                materialEditor.ShaderProperty(_BarXDistance, new GUIContent("Horizontal Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_BarXOffset, new GUIContent("Horizontal Bar Shift Offset", "Adjust the offset of the alternating position."));
                 GUILayout.Space(20);
                 materialEditor.ShaderProperty(_BarYAngle, new GUIContent("Vertical Bar Shift Angle", "Adjust the angle of the vertical screen bars."));
-                materialEditor.ShaderProperty(_BarYDistance, new GUIContent("Vertical Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_BarYInterval, new GUIContent("Vertical Bar Shift Interval", "Adjust how often the bars alternate from positive to negative values."));
+                materialEditor.ShaderProperty(_BarYDistance, new GUIContent("Vertical Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_BarYOffset, new GUIContent("Vertical Bar Shift Offset", "Adjust the offset of the alternating position."));
             }
 
@@ -755,13 +887,13 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionSinBar)
             {
                 materialEditor.ShaderProperty(_SinBarXAngle, new GUIContent("Horizontal Sin Bar Shift Angle", "Adjust the angle of the horizontal screen bars."));
-                materialEditor.ShaderProperty(_SinBarXDistance, new GUIContent("Horizontal Sin Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_SinBarXInterval, new GUIContent("Horizontal Sin Bar Shift Interval", "Adjust how often the bars alternate from positive to negative values."));
+                materialEditor.ShaderProperty(_SinBarXDistance, new GUIContent("Horizontal Sin Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_SinBarXOffset, new GUIContent("Horizontal Sin Bar Shift Offset", "Adjust the offset of the alternating position."));
                 GUILayout.Space(20);
                 materialEditor.ShaderProperty(_SinBarYAngle, new GUIContent("Vertical Sin Bar Shift Angle", "Adjust the angle of the vertical screen bars."));
-                materialEditor.ShaderProperty(_SinBarYDistance, new GUIContent("Vertical Sin Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_SinBarYInterval, new GUIContent("Vertical Sin Bar Shift Interval", "Adjust how often the bars alternate from positive to negative values."));
+                materialEditor.ShaderProperty(_SinBarYDistance, new GUIContent("Vertical Sin Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_SinBarYOffset, new GUIContent("Vertical Sin Bar Shift Offset", "Adjust the offset of the alternating position."));
             }
 
@@ -770,13 +902,13 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionZigZag)
             {
                 materialEditor.ShaderProperty(_ZigZagXAngle, new GUIContent("Horizontal Zigzag Angle", "Adjust the angle of the horizontal screen zigzag."));
-                materialEditor.ShaderProperty(_ZigZagXAmplitude, new GUIContent("Horizontal Zigzag Distance", "Adjust how far the zigzag shifts the screen."));
                 materialEditor.ShaderProperty(_ZigZagXDensity, new GUIContent("Horizontal Zigzag Interval", "Adjust the distance between the zigzag direction changes."));
+                materialEditor.ShaderProperty(_ZigZagXAmplitude, new GUIContent("Horizontal Zigzag Distance", "Adjust how far the zigzag shifts the screen."));
                 materialEditor.ShaderProperty(_ZigZagXOffset, new GUIContent("Horizontal Zigzag Offset", "Adjust the offset of the zigzag points."));
                 GUILayout.Space(20);
                 materialEditor.ShaderProperty(_ZigZagYAngle, new GUIContent("Vertical Zigzag Angle", "Adjust the angle of the vertical screen zigzag."));
-                materialEditor.ShaderProperty(_ZigZagYAmplitude, new GUIContent("Vertical Zigzag Distance", "Adjust how far the zigzag shifts the screen."));
                 materialEditor.ShaderProperty(_ZigZagYDensity, new GUIContent("Vertical Zigzag Interval", "Adjust the distance between the zigzag direction changes."));
+                materialEditor.ShaderProperty(_ZigZagYAmplitude, new GUIContent("Vertical Zigzag Distance", "Adjust how far the zigzag shifts the screen."));
                 materialEditor.ShaderProperty(_ZigZagYOffset, new GUIContent("Vertical Zigzag Offset", "Adjust the offset of the zigzag points."));
             }
 
@@ -785,8 +917,8 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionSinWave)
             {
                 materialEditor.ShaderProperty(_SinWaveAngle, new GUIContent("Sin Wave Angle", "Adjust the angle of the horizontal screen sin wave."));
-                materialEditor.ShaderProperty(_SinWaveAmplitude, new GUIContent("Sin Wave Distance", "Adjust how far the sin wave shifts the screen."));
                 materialEditor.ShaderProperty(_SinWaveDensity, new GUIContent("Sin Wave Density", "Adjust the distance between the sin wave direction changes."));
+                materialEditor.ShaderProperty(_SinWaveAmplitude, new GUIContent("Sin Wave Distance", "Adjust how far the sin wave shifts the screen."));
                 materialEditor.ShaderProperty(_SinWaveOffset, new GUIContent("Sin Wave Offset", "Adjust the offset of the sin wave points."));
             }
 
@@ -795,8 +927,8 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionCosWave)
             {
                 materialEditor.ShaderProperty(_CosWaveAngle, new GUIContent("Cos Wave Angle", "Adjust the angle of the horizontal screen cosine wave."));
-                materialEditor.ShaderProperty(_CosWaveAmplitude, new GUIContent("Cos Wave Distance", "Adjust how far the cosine wave shifts the screen."));
                 materialEditor.ShaderProperty(_CosWaveDensity, new GUIContent("Cos Wave Density", "Adjust the distance between the cosine wave direction changes."));
+                materialEditor.ShaderProperty(_CosWaveAmplitude, new GUIContent("Cos Wave Distance", "Adjust how far the cosine wave shifts the screen."));
                 materialEditor.ShaderProperty(_CosWaveOffset, new GUIContent("Cos Wave Offset", "Adjust the offset of the cosine wave points."));
             }
 
@@ -805,8 +937,8 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionTanWave)
             {
                 materialEditor.ShaderProperty(_TanWaveAngle, new GUIContent("Tan Wave Angle", "Adjust the angle of the horizontal screen tangent wave."));
-                materialEditor.ShaderProperty(_TanWaveAmplitude, new GUIContent("Tan Wave Distance", "Adjust how far the tangent wave shifts the screen."));
                 materialEditor.ShaderProperty(_TanWaveDensity, new GUIContent("Tan Wave Density", "Adjust the distance between the tangent wave direction changes."));
+                materialEditor.ShaderProperty(_TanWaveAmplitude, new GUIContent("Tan Wave Distance", "Adjust how far the tangent wave shifts the screen."));
                 materialEditor.ShaderProperty(_TanWaveOffset, new GUIContent("Tan Wave Offset", "Adjust the offset of the tangent wave points."));
             }
 
@@ -815,7 +947,7 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionSlice)
             {
                 materialEditor.ShaderProperty(_SliceAngle, new GUIContent("Slice Angle", "Adjust the angle of the screen slice."));
-                materialEditor.ShaderProperty(_SliceOffset, new GUIContent("Slice Offset", "Adjust the offset of the slice from the center of the screen. The slice angle controls which direction the offset pushes the slice."));
+                materialEditor.ShaderProperty(_SliceOffset, new GUIContent("Slice Offset From Center", "Adjust the offset of the slice from the center of the screen. The slice angle controls which direction the offset pushes the slice."));
                 materialEditor.ShaderProperty(_SliceWidth, new GUIContent("Slice Width", "Adjust the width of the screen slice."));
                 materialEditor.ShaderProperty(_SliceDistance, new GUIContent("Slice Distance", "Adjust how far the screen slice shifts the screen."));
             }
@@ -824,11 +956,11 @@ public class StereoCancerGUI : ShaderGUI
 
             if (displayDistortionRipple)
             {
-                materialEditor.ShaderProperty(_RippleDensity, new GUIContent("Ripple Density", "Adjust the distance between the screen water ripples."));
-                materialEditor.ShaderProperty(_RippleAmplitude, new GUIContent("Ripple Amplitude", "Adjust the distance the ripples push the screen at the peaks."));
-                materialEditor.ShaderProperty(_RippleOffset, new GUIContent("Ripple Offset", "Adjust the offset of the ripples away from the center of the screen."));
                 materialEditor.ShaderProperty(_RippleInnerFalloff, new GUIContent("Ripple Inner Falloff", "Select an inner distance from the center of the screen to stop displaying the ripple effect."));
                 materialEditor.ShaderProperty(_RippleOuterFalloff, new GUIContent("Ripple Outer Falloff", "Select an outer distance from the center of the screen to stop displaying the ripple effect."));
+                materialEditor.ShaderProperty(_RippleDensity, new GUIContent("Ripple Density", "Adjust the distance between the screen water ripples."));
+                materialEditor.ShaderProperty(_RippleAmplitude, new GUIContent("Ripple Distance", "Adjust the distance the ripples push the screen at the peaks."));
+                materialEditor.ShaderProperty(_RippleOffset, new GUIContent("Ripple Offset", "Adjust the offset of the ripples away from the center of the screen."));
             }
 
             displayDistortionCheckerboard = EditorGUILayout.Foldout(displayDistortionCheckerboard, "Checkerboard", true, scFoldoutStyle);
@@ -862,28 +994,28 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionWarp)
             {
                 materialEditor.ShaderProperty(_WarpAngle, new GUIContent("Warp Angle", "Adjust the angle of the screen warping."));
-                materialEditor.ShaderProperty(_WarpIntensity, new GUIContent("Warp Intensity", "Adjust the intensity of the screen warping."));
+                materialEditor.ShaderProperty(_WarpIntensity, new GUIContent("Warp Distance", "Adjust the maximum distance of the screen warping."));
             }
 
             displayDistortionSpiral = EditorGUILayout.Foldout(displayDistortionSpiral, "Spiral", true, scFoldoutStyle);
 
             if (displayDistortionSpiral)
             {
-                materialEditor.ShaderProperty(_SpiralIntensity, new GUIContent("Spiral Intensity", "Adjust how quickly the screen spirals with respect to the distance from the center of the screen."));
+                materialEditor.ShaderProperty(_SpiralIntensity, new GUIContent("Spiral Distance", "Adjust how quickly the screen spirals with respect to the distance from the center of the screen."));
             }
 
             displayDistortionPolarInversion = EditorGUILayout.Foldout(displayDistortionPolarInversion, "Polar Inversion", true, scFoldoutStyle);
 
             if (displayDistortionPolarInversion)
             {
-                materialEditor.ShaderProperty(_PolarInversionIntensity, new GUIContent("Polar Inversion Intensity", "Adjust how far the screen is pushed into or out of the center of the screen. Combine with 'Wrap' World Sampling Mode for maximum effect."));
+                materialEditor.ShaderProperty(_PolarInversionIntensity, new GUIContent("Polar Inversion Distance", "Adjust how far the screen is pushed into or out of the center of the screen. Combine with 'Wrap' World Sampling Mode for maximum effect."));
             }
 
             displayDistortionFishEye = EditorGUILayout.Foldout(displayDistortionFishEye, "Fish Eye", true, scFoldoutStyle);
 
             if (displayDistortionFishEye)
             {
-                materialEditor.ShaderProperty(_FishEyeIntensity, new GUIContent("Fish Eye Intensity", "Adjust the intensity of the fish eye effect."));
+                materialEditor.ShaderProperty(_FishEyeIntensity, new GUIContent("Fish Eye Distance", "Adjust the distance of the fish eye effect."));
             }
 
             displayDistortionKaleidoscope = EditorGUILayout.Foldout(displayDistortionKaleidoscope, "Kaleidoscope", true, scFoldoutStyle);
@@ -900,8 +1032,8 @@ public class StereoCancerGUI : ShaderGUI
             {
                 materialEditor.ShaderProperty(_BlockDisplacementAngle, new GUIContent("Block Displacement Angle", "Adjust the angle of the block displacement grid."));
                 materialEditor.ShaderProperty(_BlockDisplacementSize, new GUIContent("Block Displacement Size", "Adjust the size of the block displacement grid."));
-                materialEditor.ShaderProperty(_BlockDisplacementIntensity, new GUIContent("Block Displacement Intensity", "Adjust the distance each block randomly displaces pixels."));
                 materialEditor.ShaderProperty(_BlockDisplacementMode, new GUIContent("Block Displacement Mode", "Select to have smooth changes in displacement over time or random displacement every frame."));
+                materialEditor.ShaderProperty(_BlockDisplacementIntensity, new GUIContent("Block Displacement Distance", "Adjust the distance each block randomly displaces pixels."));
                 materialEditor.ShaderProperty(_BlockDisplacementOffset, new GUIContent("Block Displacement Offset", "Adjust the offset into the selected displacement mode."));
             }
 
@@ -915,9 +1047,11 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_MinGlitchHeight, new GUIContent("Glitch Minimum Height", "Adjust the minimum height of the glitches."));
                 materialEditor.ShaderProperty(_MaxGlitchWidth, new GUIContent("Glitch Maximum Width", "Adjust the maximum width of the glitches."));
                 materialEditor.ShaderProperty(_MaxGlitchHeight, new GUIContent("Glitch Maximum Height", "Adjust the maximum height of the glitches."));
-                materialEditor.ShaderProperty(_GlitchIntensity, new GUIContent("Glitch Intensity", "Adjust how far the glitches shift the screen."));
+
+                GUILayout.Space(20);
+                materialEditor.ShaderProperty(_GlitchIntensity, new GUIContent("Glitch Distance", "Adjust how far the glitches shift the screen."));
                 materialEditor.ShaderProperty(_GlitchSeed, new GUIContent("Glitch Seed", "Adjust the random seed used for generating glitches."));
-                materialEditor.ShaderProperty(_GlitchSeedInterval, new GUIContent("Glitch Seed Interval", "Adjust how far the seed much change before new glitches are generated."));
+                materialEditor.ShaderProperty(_GlitchSeedInterval, new GUIContent("Glitch Seed Interval", "Adjust how far the seed must change before new glitches are generated."));
             }
 
             displayDistortionSimplexNoise = EditorGUILayout.Foldout(displayDistortionSimplexNoise, "Simplex Noise", true, scFoldoutStyle);
@@ -934,9 +1068,11 @@ public class StereoCancerGUI : ShaderGUI
             if (displayDistortionVoroniNoise)
             {
                 materialEditor.ShaderProperty(_VoroniNoiseScale, new GUIContent("Voroni Noise Scale", "Adjust the scale of the noise."));
-                materialEditor.ShaderProperty(_VoroniNoiseStrength, new GUIContent("Voroni Noise Strength", "Adjust the distance the noise shifts the screen."));
                 materialEditor.ShaderProperty(_VoroniNoiseBorderSize, new GUIContent("Voroni Noise Border Size", "Adjust the size of the voroni noise borders"));
                 materialEditor.ShaderProperty(_VoroniNoiseBorderMode, new GUIContent("Voroni Noise Border Mode", "Adjust the mode of the voroni borders."));
+
+                GUILayout.Space(20);
+                materialEditor.ShaderProperty(_VoroniNoiseStrength, new GUIContent("Voroni Noise Strength", "Adjust the distance the noise shifts the screen."));
                 materialEditor.ShaderProperty(_VoroniNoiseBorderStrength, new GUIContent("Voroni Noise Border Strength", "Adjust the distance the borders shift the screen."));
                 materialEditor.ShaderProperty(_VoroniNoiseOffset, new GUIContent("Voroni Noise Offset", "Adjust the offset into the noise used for shifting the screen."));
             }
@@ -945,9 +1081,9 @@ public class StereoCancerGUI : ShaderGUI
 
             if (displayDistortionFan)
             {
-                materialEditor.ShaderProperty(_FanDistance, new GUIContent("Fan Distance", "Adjust the distance the fans shift the screen."));
                 materialEditor.ShaderProperty(_FanScale, new GUIContent("Fan Scale", "Adjust the size of the fans."));
                 materialEditor.ShaderProperty(_FanBlades, new GUIContent("Fan Blades", "Adjust the number of fan blades."));
+                materialEditor.ShaderProperty(_FanDistance, new GUIContent("Fan Distance", "Adjust the distance the fans shift the screen."));
                 materialEditor.ShaderProperty(_FanOffset, new GUIContent("Fan Offset", "Adjust the offset into the blade effect to create different patterns based on the 'Fan Distance'."));
             }
 
@@ -955,26 +1091,26 @@ public class StereoCancerGUI : ShaderGUI
 
             if (displayDistortionGeometricDither)
             {
-                materialEditor.ShaderProperty(_GeometricDitherDistance, new GUIContent("Geometric Dither Distance", "Adjust the distance the pixels are geometrically dithered away from their original position."));
                 materialEditor.ShaderProperty(_GeometricDitherQuality, new GUIContent("Geometric Dither Quality", "Adjust the quality of the dither effect."));
                 materialEditor.ShaderProperty(_GeometricDitherRandomization, new GUIContent("Geometric Dither Randomization", "Adjust how quickly the dither effect is randomly moved around."));
+                materialEditor.ShaderProperty(_GeometricDitherDistance, new GUIContent("Geometric Dither Distance", "Adjust the distance the pixels are geometrically dithered away from their original position."));
             }
 
             displayDistortionColorDisplacement = EditorGUILayout.Foldout(displayDistortionColorDisplacement, "Color Displacement", true, scFoldoutStyle);
 
             if (displayDistortionColorDisplacement)
             {
-                materialEditor.ShaderProperty(_ColorVectorDisplacementStrength, new GUIContent("Color Displacement Strength", "Adjust the strength of the displacement based on the color of the screen."));
                 materialEditor.ShaderProperty(_ColorVectorDisplacementCoordinateSpace, new GUIContent("Color Displacement Coordinate Space", "Select between displacing the pixels along the view or in world space."));
+                materialEditor.ShaderProperty(_ColorVectorDisplacementStrength, new GUIContent("Color Displacement Strength", "Adjust the strength of the displacement based on the color of the screen."));
             }
 
-            displayDistortionNormalDisplacement = EditorGUILayout.Foldout(displayDistortionNormalDisplacement, "Normal Displacement  (Requires Directional Light)", true, scFoldoutStyle);
+            displayDistortionNormalDisplacement = EditorGUILayout.Foldout(displayDistortionNormalDisplacement, "Normal Displacement (Requires Directional Light)", true, scFoldoutStyle);
 
             if (displayDistortionNormalDisplacement)
             {
-                materialEditor.ShaderProperty(_NormalVectorDisplacementStrength, new GUIContent("Normal Displacement Strength", "Adjust the strength of the displacement based on the normal of the surface underneath each pixel."));
                 materialEditor.ShaderProperty(_NormalVectorDisplacementCoordinateSpace, new GUIContent("Normal Displacement Coordinate Space", "Select between displacing the pixels along the view or in world space."));
                 materialEditor.ShaderProperty(_NormalVectorDisplacementQuality, new GUIContent("Normal Displacement Quality", "Adjust the quality of the surface normal reconstruction."));
+                materialEditor.ShaderProperty(_NormalVectorDisplacementStrength, new GUIContent("Normal Displacement Strength", "Adjust the strength of the displacement based on the normal of the surface underneath each pixel."));
             }
 
             EditorGUI.indentLevel = 0;
@@ -1014,46 +1150,59 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_BlurMovementRange, new GUIContent("Movement Range", "Adjust how much of the pixels movement is blurred together."));
                 materialEditor.ShaderProperty(_BlurMovementExtrapolation, new GUIContent("Movement Extrapolation", "Adjust how much movement of the pixel can be extrapolated past its starting or ending points."));
                 materialEditor.ShaderProperty(_BlurMovementOpacity, new GUIContent("Movement Opacity", "Adjust how much the blur is blended onto the screen."));
+                materialEditor.ShaderProperty(_BlurMovementBlend, new GUIContent("Movement Blend", "Adjust how much the blur is blended with the screen. Use values less than 1 to combine with Chromatic Aberration or RGB Distortion Desync."));
             }
 
             displayChromaticAberration = EditorGUILayout.Foldout(displayChromaticAberration, "Chromatic Aberration", true, scFoldoutStyle);
 
             if (displayChromaticAberration)
             {
-                materialEditor.ShaderProperty(_ChromaticAbberationStrength, new GUIContent("Chromatic Abberation Strength", "Adjust the strength of the chromatic aberration."));
-                materialEditor.ShaderProperty(_ChromaticAbberationSeparation, new GUIContent("Chromatic Abberation Separation", "Adjust the separation between each color channel."));
-                materialEditor.ShaderProperty(_ChromaticAbberationShape, new GUIContent("Chromatic Abberation Shape", "Select the shape of the chromatic aberration."));
+                materialEditor.ShaderProperty(_ChromaticAberrationShape, new GUIContent("Chromatic Aberration Shape", "Select the shape of the chromatic aberration."));
+                materialEditor.ShaderProperty(_ChromaticAberrationSeparation, new GUIContent("Chromatic Aberration Separation", "Adjust the separation between each color channel."));
+                materialEditor.ShaderProperty(_ChromaticAberrationStrength, new GUIContent("Chromatic Aberration Strength", "Adjust the strength of the chromatic aberration."));
+                materialEditor.ShaderProperty(_ChromaticAberrationBlend, new GUIContent("Chromatic Aberration Blend", "Adjust how much the chromatic aberration is blended with the screen. Use values less than 1 to combine with RGB Distortion Desync or Cancer Movement Blur."));
+            }
+
+            displayRGBDistortionDesync = EditorGUILayout.Foldout(displayRGBDistortionDesync, "RGB Distortion Desync", true, scFoldoutStyle);
+
+            if (displayRGBDistortionDesync)
+            {
+                materialEditor.ShaderProperty(_DistortionDesyncR, new GUIContent("Red Channel Desync", "Adjust how much the red color channel distortion is desynchronized."));
+                materialEditor.ShaderProperty(_DistortionDesyncG, new GUIContent("Green Channel Desync", "Adjust how much the green color channel distortion is desynchronized."));
+                materialEditor.ShaderProperty(_DistortionDesyncB, new GUIContent("Blue Channel Desync", "Adjust how much the blue color channel distortion is desynchronized."));
+                materialEditor.ShaderProperty(_DistortionDesyncBlend, new GUIContent("Distortion Desync Blend", "Adjust how much the desynced distortion is blended with the screen. Use values less than 1 to combine with Chromatic Aberration or Cancer Movement Blur."));
             }
 
             displayCircularVignette = EditorGUILayout.Foldout(displayCircularVignette, "Circular Vignette", true, scFoldoutStyle);
 
             if (displayCircularVignette)
             {
-                materialEditor.ShaderProperty(_CircularVignetteColor, new GUIContent("Circular Vignette Color", "Adjust the color of the vignette."));
-                materialEditor.ShaderProperty(_CircularVignetteOpacity, new GUIContent("Circular Vignette Opacity", "Adjust the opacity of the vignette."));
                 materialEditor.ShaderProperty(_CircularVignetteMode, new GUIContent("Circular Vignette Function", "Adjust the function used to determine how quickly the vignette fades in between the beginning and ending distances."));
                 materialEditor.ShaderProperty(_CircularVignetteRoundness, new GUIContent("Circular Vignette Roundness", "Adjust how round the vignette is, which can be used to create a blinking/eyes closing effect."));
                 materialEditor.ShaderProperty(_CircularVignetteBegin, new GUIContent("Circular Vignette Begin Distance", "Adjust the distance that the vignette begins to blend in."));
                 materialEditor.ShaderProperty(_CircularVignetteEnd, new GUIContent("Circular Vignette End Distance", "Adjust the distance that the vignette reaches maximum opacity."));
+                materialEditor.ShaderProperty(_CircularVignetteScaleWithDistance, new GUIContent("Circular Vignette Scale With Distance", "Select if the vignette should be scaled with distance. Recommended when using coordinate space Centered On Object."));
+                materialEditor.ShaderProperty(_CircularVignetteColor, new GUIContent("Circular Vignette Color", "Adjust the color of the vignette."));
+                materialEditor.ShaderProperty(_CircularVignetteOpacity, new GUIContent("Circular Vignette Opacity", "Adjust the opacity of the vignette."));
             }
 
-            displayFog = EditorGUILayout.Foldout(displayFog, "Fog  (Requires Directional Light)", true, scFoldoutStyle);
+            displayFog = EditorGUILayout.Foldout(displayFog, "Fog (Requires Directional Light)", true, scFoldoutStyle);
 
             if (displayFog)
             {
                 materialEditor.ShaderProperty(_FogType, new GUIContent("Fog Function", "Select the function used to detmine how quickly the fog reaches maximum opacity between the beginning and ending distances."));
-                materialEditor.ShaderProperty(_FogColor, new GUIContent("Fog Color", "Adjust the color of the fog."));
                 materialEditor.ShaderProperty(_FogBegin, new GUIContent("Fog Begin Distance", "Adjust the distance that the fog begins to blend in."));
                 materialEditor.ShaderProperty(_FogEnd, new GUIContent("Fog End Distance", "Adjust the distance that the fog reaches maximum opacity."));
+                materialEditor.ShaderProperty(_FogColor, new GUIContent("Fog Color", "Adjust the color of the fog."));
             }
 
             displayEdgelordStriples = EditorGUILayout.Foldout(displayEdgelordStriples, "Edgelord Stripes", true, scFoldoutStyle);
 
             if (displayEdgelordStriples)
             {
-                materialEditor.ShaderProperty(_EdgelordStripeColor, new GUIContent("Stripe Color", "Adjust the color of the stripes."));
                 materialEditor.ShaderProperty(_EdgelordStripeSize, new GUIContent("Stripe Size", "Adjust the size of the stripes."));
                 materialEditor.ShaderProperty(_EdgelordStripeOffset, new GUIContent("Stripe Offset", "Adjust the vertical offset of the stripes."));
+                materialEditor.ShaderProperty(_EdgelordStripeColor, new GUIContent("Stripe Color", "Adjust the color of the stripes."));
             }
 
             displayColorMask = EditorGUILayout.Foldout(displayColorMask, "Color Mask", true, scFoldoutStyle);
@@ -1063,11 +1212,10 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_ColorMask, new GUIContent("Mask", "Apply a mask to the screen to remove unwanted colors. For example, a red mask will remove all green and blue colors."));
             }
 
-            displayColorPalette = EditorGUILayout.Foldout(displayColorPalette, "Color Palettization", true, scFoldoutStyle);
+            displayColorPalette = EditorGUILayout.Foldout(displayColorPalette, "Color Palettization (Requires Directional Light)", true, scFoldoutStyle);
 
             if (displayColorPalette)
             {
-                materialEditor.ShaderProperty(_PaletteOpacity, new GUIContent("Opacity", "Adjust how much of the color palette is blended into the screen color."));
                 materialEditor.ShaderProperty(_PaletteScale, new GUIContent("Scale", "Adjust the scale of the color palette in the world."));
                 materialEditor.ShaderProperty(_PaletteOffset, new GUIContent("Offset", "Adjust the offset of the color palette."));
                 materialEditor.ShaderProperty(_PalleteSource, new GUIContent("Control Source", "Select if the color palette should be automatically generated from the screen colors, or user specified."));
@@ -1075,6 +1223,7 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_PaletteB, new GUIContent("Palette Bias B", "Adjust the contast and brightness of the color palette."));
                 materialEditor.ShaderProperty(_PaletteOscillation, new GUIContent("Palette Oscillation", "Adjust how quickly the palette color changes. Integer values should be used in order for offset to smoothly loop through the palette."));
                 materialEditor.ShaderProperty(_PalettePhase, new GUIContent("Palette Phase", "Adjust how quickly the colors loop back around."));
+                materialEditor.ShaderProperty(_PaletteOpacity, new GUIContent("Opacity", "Adjust how much of the color palette is blended into the screen color."));
             }
 
             displayColorInversion = EditorGUILayout.Foldout(displayColorInversion, "Color Inversion", true, scFoldoutStyle);
@@ -1102,15 +1251,19 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_Hue, new GUIContent("Hue", "Adjust the hue of the screen."));
                 materialEditor.ShaderProperty(_Saturation, new GUIContent("Saturation", "Adjust the saturation of the screen."));
                 materialEditor.ShaderProperty(_Value, new GUIContent("Value", "Adjust the value of the screen."));
+
+                GUILayout.Space(20);
+                materialEditor.ShaderProperty(_ClampSaturation, new GUIContent("Clamp Saturation", "Select if saturation should be clamped between 0 and 1. Useful for turning the screen black and white."));
+                
             }
             
             displayImaginaryColor = EditorGUILayout.Foldout(displayImaginaryColor, "Imaginary Color", true, scFoldoutStyle);
 
             if (displayImaginaryColor)
             {
+                materialEditor.ShaderProperty(_ImaginaryColorAngle, new GUIContent("Imaginary Color Angle", "Adjust the rotation of the color wheel."));
                 materialEditor.ShaderProperty(_ImaginaryColorBlendMode, new GUIContent("Imaginary Color Blend Mode", "Adjust blend mode of the color wheel."));
                 materialEditor.ShaderProperty(_ImaginaryColorOpacity, new GUIContent("Imaginary Color Opacity", "Adjust how much the imaginary colors are blended into the screen color."));
-                materialEditor.ShaderProperty(_ImaginaryColorAngle, new GUIContent("Imaginary Color Angle", "Adjust the rotation of the color wheel."));
             }
 
             displaySobel = EditorGUILayout.Foldout(displaySobel, "Sobel Filter", true, scFoldoutStyle);
@@ -1118,29 +1271,31 @@ public class StereoCancerGUI : ShaderGUI
             if (displaySobel)
             {
                 materialEditor.ShaderProperty(_SobelSearchDistance, new GUIContent("Sobel Search Distance", "Adjust how far each pixel searches for outlines."));
-                materialEditor.ShaderProperty(_SobelQuality, new GUIContent("Sobel Quality", "Adjust the quality of the sobel filter."));
-                materialEditor.ShaderProperty(_SobelOpacity, new GUIContent("Sobel Opacity", "Adjust how much the sobel filter is blended into the screen color."));
+                materialEditor.ShaderProperty(_SobelQuality, new GUIContent("Sobel Quality", "Adjust the quality of the sobel filter. It's recommended that Projected Coordinate Space is used to further increase quality."));
                 materialEditor.ShaderProperty(_SobelBlendMode, new GUIContent("Sobel Blend Mode", "Adjust the blend mode of the sobel filter."));
+                materialEditor.ShaderProperty(_SobelOpacity, new GUIContent("Sobel Opacity", "Adjust how much the sobel filter is blended into the screen color."));
             }
 
             displayColorShift = EditorGUILayout.Foldout(displayColorShift, "Color Channel Shift", true, scFoldoutStyle);
 
             if (displayColorShift)
             {
-                materialEditor.ShaderProperty(_colorSkewRDistance, new GUIContent("Red Channel Shift Distance", "Adjust how far the color channel is shifted."));
-                materialEditor.ShaderProperty(_colorSkewRAngle, new GUIContent("Red Channel Shift Angle", "Adjust the angle of the color shift."));
-                materialEditor.ShaderProperty(_colorSkewROpacity, new GUIContent("Red Channel Shift Opacity", "Adjust the opacity of the shifted color channel."));
                 materialEditor.ShaderProperty(_colorSkewROverride, new GUIContent("Red Channel Shift Override", "Select between blending the shifted color or replacing the screen's color channel with the shifted version."));
+                materialEditor.ShaderProperty(_colorSkewRAngle, new GUIContent("Red Channel Shift Angle", "Adjust the angle of the color shift."));
+                materialEditor.ShaderProperty(_colorSkewRDistance, new GUIContent("Red Channel Shift Distance", "Adjust how far the color channel is shifted."));
+                materialEditor.ShaderProperty(_colorSkewROpacity, new GUIContent("Red Channel Shift Opacity", "Adjust the opacity of the shifted color channel."));
+                
                 GUILayout.Space(20);
-                materialEditor.ShaderProperty(_colorSkewGDistance, new GUIContent("Green Channel Shift Distance", "Adjust how far the color channel is shifted."));
-                materialEditor.ShaderProperty(_colorSkewGAngle, new GUIContent("Green Channel Shift Angle", "Adjust the angle of the color shift."));
-                materialEditor.ShaderProperty(_colorSkewGOpacity, new GUIContent("Green Channel Shift Opacity", "Adjust the opacity of the shifted color channel."));
                 materialEditor.ShaderProperty(_colorSkewGOverride, new GUIContent("Green Channel Shift Override", "Select between blending the shifted color or replacing the screen's color channel with the shifted version."));
+                materialEditor.ShaderProperty(_colorSkewGAngle, new GUIContent("Green Channel Shift Angle", "Adjust the angle of the color shift."));
+                materialEditor.ShaderProperty(_colorSkewGDistance, new GUIContent("Green Channel Shift Distance", "Adjust how far the color channel is shifted."));
+                materialEditor.ShaderProperty(_colorSkewGOpacity, new GUIContent("Green Channel Shift Opacity", "Adjust the opacity of the shifted color channel."));
+
                 GUILayout.Space(20);
-                materialEditor.ShaderProperty(_colorSkewBDistance, new GUIContent("Blue Channel Shift Distance", "Adjust how far the color channel is shifted."));
-                materialEditor.ShaderProperty(_colorSkewBAngle, new GUIContent("Blue Channel Shift Angle", "Adjust the angle of the color shift."));
-                materialEditor.ShaderProperty(_colorSkewBOpacity, new GUIContent("Blue Channel Shift Opacity", "Adjust the opacity of the shifted color channel."));
                 materialEditor.ShaderProperty(_colorSkewBOverride, new GUIContent("Blue Channel Shift Override", "Select between blending the shifted color or replacing the screen's color channel with the shifted version."));
+                materialEditor.ShaderProperty(_colorSkewBAngle, new GUIContent("Blue Channel Shift Angle", "Adjust the angle of the color shift."));
+                materialEditor.ShaderProperty(_colorSkewBDistance, new GUIContent("Blue Channel Shift Distance", "Adjust how far the color channel is shifted."));
+                materialEditor.ShaderProperty(_colorSkewBOpacity, new GUIContent("Blue Channel Shift Opacity", "Adjust the opacity of the shifted color channel."));
             }
 
             EditorGUI.indentLevel = 0;

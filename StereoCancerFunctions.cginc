@@ -14,9 +14,7 @@
 //
 // ex. Geometric Dither is created by using SkewX and SkewY repeatedly with varying parameter values
 //
-// LICENSE: This shader is licensed under GPL V3 as it makes usage of
-//			CancerSpace's mirror check which inherently means this must be
-//			licensed under the same GPL V3 license.
+// LICENSE: This shader is licensed under GPL V3.
 //			https://www.gnu.org/licenses/gpl-3.0.en.html
 //
 //			This shader makes use of the perlin noise generator from https://github.com/keijiro/NoiseShader
@@ -40,12 +38,8 @@
 // Returns true when the vertex or fragment should not be visible
 bool mirrorCheck(float cancerDisplayMode)
 {
-	// Disable for mirrors so effects like Swirl don't get unwrapped by mirrors.
-	// Check shamelessly copy-pasted from CancerSpace, shout outs to AkaiMage.
-	// https://github.com/AkaiMage/VRC-Cancerspace
-	//
-	// Note: Does not contain the additional checks CancerSpace includes,
-	//		 such as Per-Eye exclusion, but is otherwise unmodified.
+	// Original source for this check seems to be from Merlin, according the the following shader:
+	//https://github.com/netri/Neitri-Unity-Shaders/blob/master/World%20Triplanar%20Mapped.shader
 	bool isMirror = unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0;
 
 	// cancerDisplayMode == 0: Display on screen only
@@ -63,7 +57,8 @@ float4 viewPosFromDepth(float4x4 invProj, float2 uv, float depth)
 	uv.x -= step(1, unity_StereoEyeIndex);
 #endif
 
-	// Convert UV to clip space and retrieve the view position
+	// Convert UV to clip space and retrieve the view position using inverse
+	// matrix multiplication.
 	// https://stackoverflow.com/questions/32227283/getting-world-position-from-depth-buffer-value
 	float4 viewPos = mul(invProj, float4(uv.xy*2.0 - 1.0, depth, 1.0));
 
@@ -105,9 +100,18 @@ float4 stereoEyeSeparation(float4 worldCoordinates, float3 axisRight, float sepa
  // Distortion functions ///
 ///////////////////////////
 
+float4 computeWorldPositionFromAxisPosition(float4 worldCoordinates)
+{
+	// Need to unflip our x coordinate. This is because the normal screen-space
+	// coordinate system is backwards compared to world coordinates.
+	worldCoordinates.x *= -1;
+	return mul(UNITY_MATRIX_I_V, worldCoordinates);
+}
+
 float4 computeStereoUV(float4 worldCoordinates)
 {
 	float4 screenCoords = mul(UNITY_MATRIX_VP, worldCoordinates);
+
 	return ComputeGrabScreenPos(screenCoords);
 }
 
@@ -189,11 +193,10 @@ float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
 	return worldCoordinates;
 }
 
-float4 projectCoordinates(sampler2D depthTexture, float3x3 inverseViewMatRot, float4 worldCoordinates, float3 camPos, float3 viewVector)
+float4 projectCoordinates(sampler2D depthTexture, float4 worldCoordinates, float3 camPos, float3 viewVector)
 {
 	// Convert from world-axis aligned coordinates to world space coordinates.
-	worldCoordinates.xyz = mul(inverseViewMatRot, worldCoordinates.xyz);
-	worldCoordinates.xyz += camPos;
+	worldCoordinates.xyz = computeWorldPositionFromAxisPosition(worldCoordinates);
 
 	// Reconstruct view coordinates from depth
 	float4 uv = computeStereoUV(worldCoordinates);
@@ -217,6 +220,9 @@ float4 stereoRotate(float4 worldCoordinates, float3 axis, float angle)
 float4 stereoMove(float4 worldPos, float3 camFront, float3 camRight, float angle, float distance)
 {
 	float3 movedPos = mul(rotAxis(camFront, angle), camRight);
+
+	// Adjust for world scale coordinates being backwards when moving stereo coordinates.
+	movedPos.xy *= -1;
 
 	worldPos.xyz += movedPos * distance;
 
@@ -485,12 +491,9 @@ float4 stereoTanWave(float4 worldCoordinates, float3 axis, float density, float 
 float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance, float offset)
 {
 	worldCoordinates.xy = rotate2D(worldCoordinates.xy, -angle);
-
 	worldCoordinates.x += offset;
 
-	UNITY_BRANCH
-	if (abs(worldCoordinates.x) <= width)
-		worldCoordinates.xyz += axis * distance;
+	worldCoordinates.xyz += (abs(worldCoordinates.x) <= width) * axis * distance;
 
 	worldCoordinates.x -= offset;
 	worldCoordinates.xy = rotate2D(worldCoordinates.xy, angle);
@@ -727,13 +730,7 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		// Running distortion effects before this runs will shift the world position
 		// away from texel centers, resulting in wildly incorrect triangle normals being
 		// generated when multiple samples sample the same depth point.
-		//
-		// Solution: Texel-aligned world positons combined with world position derivatives.
-		float4 centerPos = worldCoordinates;
-
-		// Generate texel aligned samples without using ddx/ddy to avoid artifacts
-		centerPos = mul(UNITY_MATRIX_VP, centerPos);
-		centerPos = ComputeGrabScreenPos(centerPos);
+		float4 centerPos = stereoPosition;
 
 		centerPos.xy = AlignWithGrabTexel(texelSize, centerPos.xy / centerPos.w);
 
@@ -747,6 +744,15 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		upPos.xy = centerPos.xy + float2(0, 1)*texelSize.xy;
 		downPos.xy = centerPos.xy + float2(0, -1)*texelSize.xy;
 
+		// Store our aligned UVs so we don't have to recalculate them.
+		float4 centerUV = centerPos;
+		float4 leftUV = leftPos;
+		float4 rightUV = rightPos;
+		float4 upUV = upPos;
+		float4 downUV = downPos;
+
+		// Calculate all of the world positions for aligned UVs
+		// for usage in calculating normals later.
 		centerPos.xy *= centerPos.w;
 		leftPos.xy *= centerPos.w;
 		rightPos.xy *= centerPos.w;
@@ -767,26 +773,20 @@ float3 normalVectorDisplacement(sampler2D textureHandle, float4 texelSize, float
 		upPos = mul(invVP, upPos);
 		downPos = mul(invVP, downPos);
 
-		float4 centerUV = computeStereoUV(centerPos);
-		float4 leftUV = computeStereoUV(leftPos);
-		float4 rightUV = computeStereoUV(rightPos);
-		float4 upUV = computeStereoUV(upPos);
-		float4 downUV = computeStereoUV(downPos);
-
 		// Calculate a perspective-correct depth for all 5 samples
-		float centerDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, centerUV);
-		float leftDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, leftUV);
-		float rightDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, rightUV);
-		float upDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, upUV);
-		float downDepth = SAMPLE_DEPTH_TEXTURE_PROJ(textureHandle, downUV);
+		float centerDepth = SAMPLE_DEPTH_TEXTURE(textureHandle, centerUV);
+		float leftDepth = SAMPLE_DEPTH_TEXTURE(textureHandle, leftUV);
+		float rightDepth = SAMPLE_DEPTH_TEXTURE(textureHandle, rightUV);
+		float upDepth = SAMPLE_DEPTH_TEXTURE(textureHandle, upUV);
+		float downDepth = SAMPLE_DEPTH_TEXTURE(textureHandle, downUV);
 
 		float4x4 invProj = inverse(UNITY_MATRIX_P);
 
-		centerDepth = length(viewPosFromDepth(invProj, centerUV.xy / centerUV.w, centerDepth / centerUV.w));
-		leftDepth = length(viewPosFromDepth(invProj, leftUV.xy / leftUV.w, leftDepth / centerUV.w));
-		rightDepth = length(viewPosFromDepth(invProj, rightUV.xy / rightUV.w, rightDepth / centerUV.w));
-		upDepth = length(viewPosFromDepth(invProj, upUV.xy / upUV.w, upDepth / centerUV.w));
-		downDepth = length(viewPosFromDepth(invProj, downUV.xy / downUV.w, downDepth / centerUV.w));
+		centerDepth = length(viewPosFromDepth(invProj, centerUV.xy, centerDepth / centerUV.w));
+		leftDepth = length(viewPosFromDepth(invProj, leftUV.xy, leftDepth / centerUV.w));
+		rightDepth = length(viewPosFromDepth(invProj, rightUV.xy, rightDepth / centerUV.w));
+		upDepth = length(viewPosFromDepth(invProj, upUV.xy, upDepth / centerUV.w));
+		downDepth = length(viewPosFromDepth(invProj, downUV.xy, downDepth / centerUV.w));
 
 		// Solve for the triangle which is the best fit
 		bool reverseOrder = false;
@@ -951,14 +951,13 @@ half3 fog(float3 bgcolor, float3 worldPosition, float fogMode, float4 fogColor, 
 // I wonder if this naming scheme will trigger any shader 'edgelords'
 half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripeSize, float offset)
 {
-	float y = uv.y + offset;
+	float y = (uv.y + offset) * rcp(stripeSize);
+	y = abs(0.5 - frac(y));
 
-	// Should implement SDF anti-aliasing if I add stripe rotation
-	UNITY_BRANCH
-	if (fmod(y, stripeSize) < stripeSize / 2.f)
-		bgColor *= half4(stripeColor.rgb * stripeColor.a, 1.0);
+	y = -10 + 10 * (y / 0.125 - 0.875);
+	y = clamp(y, 0, 1);
 
-	return bgColor;
+	return lerp(bgColor, half4(stripeColor.rgb, 1.0), y*stripeColor.a);
 }
 
 half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount,
@@ -1004,11 +1003,14 @@ half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates,
 	return lerp(backgroundColor, (color.rgb) / accumulatedAttenuation, opacity);
 }
 
-half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation, float shape)
+half4 chromaticAberration(sampler2D abberationTexture, float4 worldCoordinates, float3 camFront, float strength, float separation, float shape)
 {
-	float4 redAbberationPos = worldCoordinates;
-	float4 greenAbberationPos = worldCoordinates;
-	float4 blueAbberationPos = worldCoordinates;
+	// Adjust for world scale coordinates being backwards when moving stereo coordinates.
+	camFront *= -1;
+
+	float4 redAberrationPos = worldCoordinates;
+	float4 greenAberrationPos = worldCoordinates;
+	float4 blueAberrationPos = worldCoordinates;
 
 	// Spherical
 	if (shape == 0)
@@ -1021,23 +1023,46 @@ half4 chromaticAbberation(sampler2D abberationTexture, float4 worldCoordinates, 
 		float angleToWorldVector = acos(dot(abberationVector, camFront));
 		angleToWorldVector = abs(angleToWorldVector) / UNITY_PI;
 
-		redAbberationPos.xyz += camFront * (angleToWorldVector * 10.0 * strength);
-		greenAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation) * strength);
-		blueAbberationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation * 2) * strength);
+		redAberrationPos.xyz += camFront * (angleToWorldVector * 10.0 * strength);
+		greenAberrationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation) * strength);
+		blueAberrationPos.xyz += camFront * (angleToWorldVector * (10.0 + separation * 2) * strength);
 	}
 	// Flat
 	else
 	{
-		greenAbberationPos.xyz += camFront * (separation)* strength;
-		blueAbberationPos.xyz += camFront * (separation * 2) * strength;
+		greenAberrationPos.xyz += camFront * (separation)* strength;
+		blueAberrationPos.xyz += camFront * (separation * 2) * strength;
 	}
+		
+	redAberrationPos = computeStereoUV(redAberrationPos);
+	greenAberrationPos = computeStereoUV(greenAberrationPos);
+	blueAberrationPos = computeStereoUV(blueAberrationPos);
 
-	redAbberationPos = computeStereoUV(redAbberationPos);
-	greenAbberationPos = computeStereoUV(greenAbberationPos);
-	blueAbberationPos = computeStereoUV(blueAbberationPos);
+	return half4(tex2Dproj(abberationTexture, redAberrationPos).r, tex2Dproj(abberationTexture, greenAberrationPos).g,
+		tex2Dproj(abberationTexture, blueAberrationPos).b, 0);
+}
 
-	return half4(tex2Dproj(abberationTexture, redAbberationPos).r, tex2Dproj(abberationTexture, greenAbberationPos).g,
-		tex2Dproj(abberationTexture, blueAbberationPos).b, 0);
+half3 rgbColorDesync(sampler2D textureHandle, float4 startingWorldPos, float4 finishedWorldPos, float redDsync, float greenDsync, float blueDsync)
+{
+	float3x4 colorPositions =
+	{
+		lerp(finishedWorldPos, startingWorldPos, redDsync),
+		lerp(finishedWorldPos, startingWorldPos, greenDsync),
+		lerp(finishedWorldPos, startingWorldPos, blueDsync)
+	};
+
+	colorPositions[0] = computeStereoUV(colorPositions[0]);
+	colorPositions[1] = computeStereoUV(colorPositions[1]);
+	colorPositions[2] = computeStereoUV(colorPositions[2]);
+
+	colorPositions /= colorPositions[0].w;
+
+	return half3
+	(
+		tex2Dproj(textureHandle, colorPositions[0]).r,
+		tex2Dproj(textureHandle, colorPositions[1]).g,
+		tex2Dproj(textureHandle, colorPositions[2]).b
+	);
 }
 
 half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sampler2D depthMap, float4 depthSamplePos, float3 camPos, float3 normal, float4 worldCoordinates, float4 axisAlignedPos,
@@ -1091,9 +1116,9 @@ half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, sa
 }
 
 
-half3 colorShift(sampler2D colorShiftTexture, float3 camFront, float3 camRight, float skewAngle, float skewDistance, float opacity, float4 grabPos)
+half3 colorShift(sampler2D colorShiftTexture, float skewAngle, float skewDistance, float opacity, float4 grabPos)
 {
-	grabPos = stereoMove(grabPos, camFront, camRight, skewAngle, skewDistance);
+	grabPos = stereoMove(grabPos, float3(0,0,1), float3(1,0,0), skewAngle, skewDistance);
 
 	half3 color = tex2Dproj(colorShiftTexture, grabPos).xyz;
 	color *= opacity;
@@ -1204,10 +1229,13 @@ half3 colorModifier(half3 bgcolor, float mode, float strength, float blend)
 	return lerp(bgcolor.rgb, modifiedColor, blend);
 }
 
-half3 applyHSV(half4 bgcolor, float hue, float saturation, float value)
+half3 applyHSV(half4 bgcolor, float hue, float saturation, float value, float _ClampSaturation)
 {
 	half3 hsvColor = rgb2hsv(bgcolor.xyz);
+
 	hsvColor.xyz += float3(hue, saturation, value);
+	if (_ClampSaturation != 0)
+		hsvColor.y = clamp(hsvColor.y, 0, 1);
 
 	return hsv2rgb(hsvColor);
 }
@@ -1246,7 +1274,9 @@ float3 sampleSobel(sampler2D textureHandle, float3 camRight, float3 camUp, float
 	float3 Gx = float3(0, 0, 0);
 	float3 Gy = float3(0, 0, 0);
 
+	[unroll(3)]
 	for (int x = 0; x < 3; x++)
+		[unroll(3)]
 		for (int y = 0; y < 3; y++)
 		{
 			// Skip center sample since the weight is 0 for both kernels
@@ -1256,7 +1286,7 @@ float3 sampleSobel(sampler2D textureHandle, float3 camRight, float3 camUp, float
 				float2 sampleOffset = float2(x - 1, y - 1) * searchDistance;
 				float4 samplePos = worldCoordinates;
 				samplePos.xyz += sampleOffset.x * camRight + sampleOffset.y * camUp;
-
+				
 				float3 cancerColor = tex2Dproj(textureHandle, computeStereoUV(samplePos));
 
 				Gx += sobelXWeight[x][y] * cancerColor;
@@ -1277,24 +1307,16 @@ float sobelFilter(sampler2D textureHandle, float3 camRight, float3 camUp, float4
 		float4x3 sobelMagMat;
 		float subSampleOffset = searchDistance / 2;
 
-		for (int i = 0; i < 4; i++)
-		{
-			float4 centerSamplePos = worldCoordinates;
+		float4 samplePosBL = worldCoordinates + float4((-camRight - camUp) * subSampleOffset, 0);
+		float4 samplePosBR = worldCoordinates + float4((camRight - camUp) * subSampleOffset, 0);
 
-			switch (i)
-			{
-			case 0: centerSamplePos.xyz += (-camRight - camUp)*subSampleOffset;
-				break;
-			case 1: centerSamplePos.xyz += (camRight - camUp)*subSampleOffset;
-				break;
-			case 2: centerSamplePos.xyz += (camRight + camUp)*subSampleOffset;
-				break;
-			case 3: centerSamplePos.xyz += (-camRight + camUp)*subSampleOffset;
-				break;
-			}
+		float4 samplePosTL = worldCoordinates + float4((camRight + camUp) * subSampleOffset, 0);
+		float4 samplePosTR = worldCoordinates + float4((-camRight + camUp) * subSampleOffset, 0);
 
-			sobelMagMat[i] = sampleSobel(textureHandle, camRight, camUp, centerSamplePos, subSampleOffset);
-		}
+		sobelMagMat[0] = sampleSobel(textureHandle, camRight, camUp, samplePosBL, subSampleOffset);
+		sobelMagMat[1] = sampleSobel(textureHandle, camRight, camUp, samplePosBR, subSampleOffset);
+		sobelMagMat[2] = sampleSobel(textureHandle, camRight, camUp, samplePosTL, subSampleOffset);
+		sobelMagMat[3] = sampleSobel(textureHandle, camRight, camUp, samplePosTR, subSampleOffset);
 
 		sobelMag = (sobelMag + (sobelMagMat[0] + sobelMagMat[1] + sobelMagMat[2] + sobelMagMat[3]) / 4) / 2;
 	}
