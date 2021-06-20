@@ -165,6 +165,13 @@ float _SinBarYDistance;
 float _SinBarYInterval;
 float _SinBarYOffset;
 
+float _MeltAngle;
+float _MeltInterval;
+float _MeltVariance;
+float _MeltDistance;
+float _MeltSeed;
+float _MeltBothDirections;
+
 float _CheckerboardAngle;
 float _CheckerboardScale;
 float _CheckerboardShift;

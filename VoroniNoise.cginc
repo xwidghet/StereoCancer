@@ -56,7 +56,7 @@ float3 voronoiNoise(float3 value){
 				float3 cell = baseCell + float3(x1, y1, z1);
 				float3 cellPosition = cell + rand3dTo3d(cell);
 				float3 toCell = cellPosition - value;
-				float distToCell = length(toCell);
+				float distToCell = dot(toCell, toCell);
 				if(distToCell < minDistToCell){
 					minDistToCell = distToCell;
 					closestCell = cell;
@@ -65,6 +65,7 @@ float3 voronoiNoise(float3 value){
 			}
 		}
 	}
+	minDistToCell = sqrt(minDistToCell);
 
 	//second pass to find the distance to the closest edge
 	float minEdgeDistance = 10;
@@ -79,7 +80,7 @@ float3 voronoiNoise(float3 value){
 				float3 toCell = cellPosition - value;
 
 				float3 diffToClosestCell = abs(closestCell - cell);
-				bool isClosestCell = diffToClosestCell.x + diffToClosestCell.y + diffToClosestCell.z < 0.1;
+				bool isClosestCell = dot(diffToClosestCell.xyz, float3(1,1,1)) < 0.1;
 				if(!isClosestCell){
 					float3 toCenter = (toClosestCell + toCell) * 0.5;
 					float3 cellDifference = normalize(toCell - toClosestCell);

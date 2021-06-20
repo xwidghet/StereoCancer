@@ -174,7 +174,7 @@ float4 wrapUVCoordinates(float4 stereoCoordinates)
 
 float4 wrapWorldCoordinates(float4 worldCoordinates, float wrapValue)
 {
-	wrapValue = wrapValue * 200;
+	wrapValue *= 200;
 	float2 signs = sign(worldCoordinates.xy);
 
 	// Adjust wrap value based on the Z coordinate to constrain
@@ -271,7 +271,7 @@ float4 stereoSplit(float4 worldPos, float3 axis, float splitPoint, float distanc
 	return worldPos;
 }
 
-float4 stereoBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
+float4 stereoBar(float4 worldPos, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
 	float quantizedPoint = fmod(abs(flipPoint) + interval / 2 + offset, interval * 2);
 	float dir = quantizedPoint < interval ? -1 : 1;
@@ -281,13 +281,31 @@ float4 stereoBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPo
 	return worldPos;
 }
 
-float4 stereoSinBar(float4 worldPos, float3 camFront, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
+float4 stereoSinBar(float4 worldPos, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
 	flipPoint = floor(flipPoint / interval);
 	float dir = sin(flipPoint + offset);
 
 	worldPos.xyz += dir * moveAxis * distance;
 
+	return worldPos;
+}
+
+float4 stereoMelt(float4 worldPos, float interval, float variance, float seed, float distance, float bothDirections)
+{
+	float displacement = floor(worldPos.x / interval);
+	displacement = rand1dTo1d(displacement + seed);
+
+	displacement -= bothDirections;
+
+	// Sign of 0 is 0, which will lead to bars which don't move and stick out.
+	float dir = sign(displacement);
+	dir = dir != 0 ? dir : 1;
+
+	displacement = displacement * variance + dir*(1.0 - variance)*0.5;
+
+	worldPos.y += displacement * distance;
+	
 	return worldPos;
 }
 

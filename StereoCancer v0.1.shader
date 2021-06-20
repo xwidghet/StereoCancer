@@ -194,6 +194,13 @@ Shader "xwidghet/StereoCancer v0.1"
 		_SinBarYInterval("Sin Bar Y Interval", Float) = 1
 		_SinBarYOffset("Sin Bar Y Offset", Float) = 0
 
+		_MeltAngle("Melt Angle", Float) = 0
+		_MeltInterval("Melt Interval", Float) = 1
+		_MeltVariance("Melt Variance", Range(0, 1)) = 0.9
+		_MeltDistance("Melt Distance", Float) = 0
+		_MeltSeed("Melt Seed", Float) = 0
+		[Enum(No, 0, Yes, 0.5)] _MeltBothDirections("Melt Both Directions", Float) = 0
+
 		_ZigZagXAngle("ZigZag X Angle", Float) = 0
 		_ZigZagXDensity("ZigZag X Density", Float) = 10
 		_ZigZagXAmplitude("ZigZag X Amplitude", Float) = 0
@@ -296,7 +303,7 @@ Shader "xwidghet/StereoCancer v0.1"
 		[Enum(Low, 0, High (Requires Directional Light), 1)] _NormalVectorDisplacementQuality("Normal Vector Displacement Quality", Float) = 1
 
 		// Screen color effects
-		_EmptySpaceColor("Empty Space Color", Color) = (0, 0, 0, 1)
+		[HDR]_EmptySpaceColor("Empty Space Color", Color) = (0, 0, 0, 1)
 
 		_SignalNoiseSize("Signal Noise Size", Float) = 1
 		_ColorizedSignalNoise("Signal Noise Colorization", Float) = 0
@@ -319,7 +326,7 @@ Shader "xwidghet/StereoCancer v0.1"
 		_DistortionDesyncB("Blue Distortion Desync", Float) = 0
 		_DistortionDesyncBlend("Distortion Desync Blend", Range(-1, 1)) = 1
 
-		_CircularVignetteColor("Circular Vignette Color", Color) = (0, 0, 0, 1)
+		[HDR]_CircularVignetteColor("Circular Vignette Color", Color) = (0, 0, 0, 1)
 		_CircularVignetteOpacity("Circular Vignette Opacity", Range(0, 1)) = 0
 		[Enum(Linear, 0, Squared, 1, Log2, 2)] _CircularVignetteMode("Circular Vignette Mode", Float) = 2
 		_CircularVignetteRoundness("Circular Vignette Roundness", Range(0, 1)) = 1
@@ -328,15 +335,15 @@ Shader "xwidghet/StereoCancer v0.1"
 		[Enum(No, 0, Yes, 1)] _CircularVignetteScaleWithDistance("Circular Vignette Scale With Distance", Float) = 0
 
 		[Enum(None,0, Linear,1, Squared,2, Log2,3, Exponential,4)] _FogType("Fog Type (Requires Directional Light)", Float) = 0
-		_FogColor("Fog Color", Color) = (0, 0, 0, 1)
+		[HDR]_FogColor("Fog Color", Color) = (0, 0, 0, 1)
 		_FogBegin("Fog Begin", Float) = 25
 		_FogEnd("Fog End", Float) = 200
 			
-		_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
+		[HDR]_EdgelordStripeColor("Edgelord Stripe Color", Color) = (0, 0, 0, 1)
 		_EdgelordStripeSize("Edgelord Stripe Size", Float) = 0
 		_EdgelordStripeOffset("Edgelord Stripe Offset", Float) = 0
 
-		_ColorMask("Color Mask", Color) = (1, 1, 1, 1)
+		[HDR]_ColorMask("Color Mask", Color) = (1, 1, 1, 1)
 
 		_PaletteOpacity("Palette Opacity", Float) = 0
 		_PaletteScale("Palette Scale", Float) = 1
@@ -679,6 +686,11 @@ Shader "xwidghet/StereoCancer v0.1"
 				// an entire animation. Also very useful for adjusting projected coordinates.
 				i.viewPos.xyz *= _CoordinateScale;
 
+				// Store the starting position to allow for things like using the
+				// derivative (ddx, ddy) to calculate nearby positions to sample depth.
+				float4 startingAxisAlignedPos = i.viewPos;
+				float4 startingWorldPos = computeWorldPositionFromAxisPosition(startingAxisAlignedPos);
+
 				// Quantize the distortion effects separately from the screen
 				float3 cancerEffectQuantizationVector = float3(0, 0, 0);
 				UNITY_BRANCH
@@ -704,7 +716,9 @@ Shader "xwidghet/StereoCancer v0.1"
 				if (_CancerEffectRange != 1)
 				{
 					cancerEffectWrapVector = i.viewPos.xyz;
-					i.viewPos = wrapWorldCoordinates(i.viewPos, _CancerEffectRange);
+
+					float samplingRange = lerp(1.0, _CancerEffectRange, i.colorDistortionFalloff.y);
+					i.viewPos = wrapWorldCoordinates(i.viewPos, samplingRange);
 
 					cancerEffectWrapVector = i.viewPos.xyz - cancerEffectWrapVector;
 				}
@@ -718,11 +732,6 @@ Shader "xwidghet/StereoCancer v0.1"
 
 					i.viewPos.xy = rotate2D(i.viewPos.xy, cameraRollAngle);
 				}
-
-				// Store the starting position to allow for things like using the
-				// derivative (ddx, ddy) to calculate nearby positions to sample depth.
-				float4 startingAxisAlignedPos = i.viewPos;
-				float4 startingWorldPos = computeWorldPositionFromAxisPosition(startingAxisAlignedPos);
 
 				// Default world-axis values for usage with axis-based effects
 				const float3 axisFront = float3(0, 0, -1);
@@ -839,7 +848,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					if (_BarXAngle != 0)
 						flipPoint = rotate2D(i.viewPos.xy, _BarXAngle).y;
 
-					i.viewPos = stereoBar(i.viewPos, axisFront, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
+					i.viewPos = stereoBar(i.viewPos, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
 				}
 				UNITY_BRANCH
 				if (_BarYDistance != 0)
@@ -849,7 +858,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					if (_BarYAngle != 0)
 						flipPoint = rotate2D(i.viewPos.xy, _BarYAngle).x;
 
-					i.viewPos = stereoBar(i.viewPos, axisFront, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
+					i.viewPos = stereoBar(i.viewPos, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
 				}
 
 				UNITY_BRANCH
@@ -860,7 +869,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					if (_SinBarXAngle != 0)
 						flipPoint = rotate2D(i.viewPos.xy, _SinBarXAngle).y;
 
-					i.viewPos = stereoSinBar(i.viewPos, axisFront, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
+					i.viewPos = stereoSinBar(i.viewPos, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
 				}
 				UNITY_BRANCH
 				if (_SinBarYDistance != 0 && _SinBarYInterval != 0)
@@ -870,7 +879,21 @@ Shader "xwidghet/StereoCancer v0.1"
 					if (_SinBarYAngle != 0)
 						flipPoint = rotate2D(i.viewPos.xy, _SinBarYAngle).x;
 
-					i.viewPos = stereoSinBar(i.viewPos, axisFront, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+					i.viewPos = stereoSinBar(i.viewPos, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+				}
+
+				UNITY_BRANCH
+				if (_MeltDistance != 0)
+				{
+					UNITY_BRANCH
+					if (_MeltAngle != 0)
+						i.viewPos.xy = rotate2D(i.viewPos.xy, _MeltAngle);
+
+					i.viewPos = stereoMelt(i.viewPos, _MeltInterval, _MeltVariance, _MeltSeed, _MeltDistance, _MeltBothDirections);
+
+					UNITY_BRANCH
+					if (_MeltAngle != 0)
+						i.viewPos.xy = rotate2D(i.viewPos.xy, -_MeltAngle);
 				}
 
 				UNITY_BRANCH
@@ -1143,12 +1166,14 @@ Shader "xwidghet/StereoCancer v0.1"
 				// Todo: Grab the frustum corners to calculate the starting
 				//		 wrap value.
 
-				// Wrap
 				if (_WorldSamplingRange != 1)
 				{
+					float samplingRange = lerp(1.0, _WorldSamplingRange, i.colorDistortionFalloff.y);
+
+					// Wrap
 					if (_WorldSamplingMode == 0)
 					{
-						i.viewPos = wrapWorldCoordinates(i.viewPos, _WorldSamplingRange);
+						i.viewPos = wrapWorldCoordinates(i.viewPos, samplingRange);
 
 						worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 
@@ -1157,7 +1182,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					// Cutout
 					else if (_WorldSamplingMode == 1)
 					{
-						float sampleLimit = _WorldSamplingRange * 100;
+						float sampleLimit = samplingRange * 100;
 						sampleLimit -= (abs(i.viewPos.z - 100) / 100)*sampleLimit;
 						sampleLimit = abs(sampleLimit);
 
@@ -1168,7 +1193,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					// Clamp
 					else if (_WorldSamplingMode == 2)
 					{
-						float sampleLimit = _WorldSamplingRange * 100;
+						float sampleLimit = samplingRange * 100;
 						sampleLimit -= (abs(i.viewPos.z - 100) / 100)*sampleLimit;
 						sampleLimit = abs(sampleLimit);
 
@@ -1182,7 +1207,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					// Empty Space
 					else if (_WorldSamplingMode == 3)
 					{
-						float sampleLimit = _WorldSamplingRange * 100;
+						float sampleLimit = samplingRange * 100;
 						sampleLimit -= (abs(i.viewPos.z - 100) / 100)*sampleLimit;
 						sampleLimit = abs(sampleLimit);
 
@@ -1199,6 +1224,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				if (clearPixel && _MemeTexOverrideMode != 2)
 					return half4(_EmptySpaceColor.rgb, _CancerOpacity);
 
+				UNITY_BRANCH
 				if (_MaskMapOpacity != 0)
 				{
 					// Toggle between final and starting pos
@@ -1244,18 +1270,18 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_RemoveCameraRoll)
 				{
-					i.viewPos.xy = rotate2D(i.viewPos.xy, -cameraRollAngle);
+					i.viewPos.xy = rotate2D(i.viewPos.xy, -cameraRollAngle * i.colorDistortionFalloff.y);
 
-					float4 temp = computeWorldPositionFromAxisPosition(i.viewPos);
-					stereoPosition = computeStereoUV(temp);
+					worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
+					stereoPosition = computeStereoUV(worldCoordinates);
 				}
 
 				UNITY_BRANCH
 				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0 || any(_CancerEffectRange != 1.f))
 				{
-					i.viewPos.xyz -= cancerEffectWrapVector;
+					i.viewPos.xyz -= cancerEffectWrapVector*i.colorDistortionFalloff.y;
 
-					i.viewPos.xyz -= _CancerEffectOffset.xyz;
+					i.viewPos.xyz -= _CancerEffectOffset.xyz*i.colorDistortionFalloff.y;
 					i.viewPos.xy = rotate2D(i.viewPos.xy, -_CancerEffectRotation);
 
 					float4 temp = computeWorldPositionFromAxisPosition(i.viewPos);
@@ -1265,7 +1291,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_CancerEffectQuantization != 0)
 				{
-					i.viewPos.xyz -= cancerEffectQuantizationVector;
+					i.viewPos.xyz -= cancerEffectQuantizationVector*i.colorDistortionFalloff.y;
 
 					float4 temp = computeWorldPositionFromAxisPosition(i.viewPos);
 					stereoPosition = computeStereoUV(temp);
@@ -1275,7 +1301,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_CoordinateSpace == 2)
 				{
-					i.viewPos.xy += i.screenSpaceObjPos.xy*_CoordinateScale;
+					i.viewPos.xy += i.screenSpaceObjPos.xy*_CoordinateScale*i.colorDistortionFalloff.y;
 
 					worldCoordinates = computeWorldPositionFromAxisPosition(i.viewPos);
 					stereoPosition = computeStereoUV(worldCoordinates);
@@ -1402,7 +1428,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					// Fog requires projected coordinates, so if the user isn't using them
 					// then we need to project the coordinates ourself.
 					if (_CoordinateSpace == 0)
-						fogWorldPosition = projectCoordinates(_CameraDepthTexture, fogWorldPosition, i.camPos, fogWorldPosition);
+						fogWorldPosition = projectCoordinates(_CameraDepthTexture, fogWorldPosition, i.camPos, normalize(fogWorldPosition));
 					// Center On Object, doesn't support mirrors. Will be black.
 					else if(_CoordinateSpace == 2)
 					{

@@ -41,6 +41,7 @@ public class StereoCancerGUI : ShaderGUI
     bool displayDistortionSkew = false;
     bool displayDistortionBar = false;
     bool displayDistortionSinBar = false;
+    bool displayDistortionMelt = false;
     bool displayDistortionZigZag = false;
     bool displayDistortionSinWave = false;
     bool displayDistortionCosWave = false;
@@ -265,6 +266,13 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _SinBarYDistance = null;
     MaterialProperty _SinBarYInterval = null;
     MaterialProperty _SinBarYOffset = null;
+
+    MaterialProperty _MeltAngle = null;
+    MaterialProperty _MeltInterval = null;
+    MaterialProperty _MeltVariance = null;
+    MaterialProperty _MeltDistance = null;
+    MaterialProperty _MeltSeed = null;
+    MaterialProperty _MeltBothDirections = null;
 
     MaterialProperty _CheckerboardAngle = null;
     MaterialProperty _CheckerboardScale = null;
@@ -895,6 +903,19 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_SinBarYInterval, new GUIContent("Vertical Sin Bar Shift Interval", "Adjust how often the bars alternate from positive to negative values."));
                 materialEditor.ShaderProperty(_SinBarYDistance, new GUIContent("Vertical Sin Bar Shift Distance", "Adjust the bar shifting distance."));
                 materialEditor.ShaderProperty(_SinBarYOffset, new GUIContent("Vertical Sin Bar Shift Offset", "Adjust the offset of the alternating position."));
+            }
+
+            displayDistortionMelt = EditorGUILayout.Foldout(displayDistortionMelt, "Melt", true, scFoldoutStyle);
+
+            if (displayDistortionMelt)
+            {
+                materialEditor.ShaderProperty(_MeltAngle, new GUIContent("Melt Angle", "Adjust the angle of the melt."));
+                materialEditor.ShaderProperty(_MeltInterval, new GUIContent("Melt Interval", "Adjust how often the melting changes direction."));
+                materialEditor.ShaderProperty(_MeltVariance, new GUIContent("Melt Variance", "Adjust how much the distortion distance can vary between melting lines."));
+                materialEditor.ShaderProperty(_MeltDistance, new GUIContent("Melt Distance", "Adjust the melting distance."));
+                materialEditor.ShaderProperty(_MeltSeed, new GUIContent("Melt Seed", "Adjust to change the randomly generated melt directions."));
+                materialEditor.ShaderProperty(_MeltBothDirections, new GUIContent("Melt Both Directions", "Select if the melting effect should melt positively and negatively or only positively."));
+                
             }
 
             displayDistortionZigZag = EditorGUILayout.Foldout(displayDistortionZigZag, "Zigzag", true, scFoldoutStyle);
