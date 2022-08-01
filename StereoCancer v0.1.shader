@@ -1355,19 +1355,14 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_TriplanarOpacity != 0)
 				{
-					half3 triplanarColor = half3(0, 0, 0);
-
 					float3 normal = normalVectorDisplacement(stereoPosition,
 						worldCoordinates, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, _TriplanarQuality);
 
-					// Sample map
-					if (_TriplanarSampleSrc == 0)
-						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
-							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 1, false);
-					// Sample screen, UV range is reduced to the range (0.2, 0.8) to hide the VR mask.
-					else
-						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
-							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 0.6, true);
+					// UV range is reduced to the range(0.2, 0.8) to hide the VR mask.
+					float sampleRange = _TriplanarSampleSrc == 0 ? 1 : 0.6;
+
+					half3 triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
+						_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, sampleRange, _TriplanarSampleSrc > 0);
 
 					triplanarColor *= _TriplanarOpacity;
 

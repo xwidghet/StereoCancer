@@ -35,6 +35,9 @@
 #ifndef STEREO_CANCER_FUNCTIONS_CGINC
 #define STEREO_CANCER_FUNCTIONS_CGINC
 
+// For SPS-I macros, such as UNITY_SAMPLE_TEX2DARRAY
+#include "HLSLSupport.cginc"
+
 // Returns true when the vertex or fragment should not be visible
 bool mirrorCheck(float cancerDisplayMode)
 {
@@ -1130,10 +1133,28 @@ half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, fl
 	// Use our (World Position or Normal) coordinates as UV coordinates, and swizzle them in an
 	// order which keeps the texture oriented right-side up on vertical walls.
 
-	// ddx and ddy are used to resolve sampling artifacts when the texture wraps around.
-	half3 colorX = tex2D(triplanarMap, frac(samplePosition.zy)*uvRangeMultiplier + uvOffset, ddx(samplePosition.z), ddy(samplePosition.y));
-	half3 colorY = tex2D(triplanarMap, frac(samplePosition.xz)*uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.z));
-	half3 colorZ = tex2D(triplanarMap, frac(samplePosition.xy)*uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.y));
+	half3 colorX, colorY, colorZ;
+
+	if (sampleScreen)
+	{
+#if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+		// SPS-I uses a Texture2D array to store the eye textures, so we need to steal the left eye texture from the array instead of simply sampling the left half of the screen texture
+		colorX = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(frac(samplePosition.zy) * uvRangeMultiplier + uvOffset, 0.0));
+		colorY = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(frac(samplePosition.xz) * uvRangeMultiplier + uvOffset, 0.0));
+		colorZ = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(frac(samplePosition.xy) * uvRangeMultiplier + uvOffset, 0.0));
+#else
+		colorX = tex2D(SCREEN_SPACE_TEXTURE_NAME, frac(samplePosition.zy) * uvRangeMultiplier + uvOffset);
+		colorY = tex2D(SCREEN_SPACE_TEXTURE_NAME, frac(samplePosition.xz) * uvRangeMultiplier + uvOffset);
+		colorZ = tex2D(SCREEN_SPACE_TEXTURE_NAME, frac(samplePosition.xy) * uvRangeMultiplier + uvOffset);
+#endif
+	}
+	else
+	{
+		// ddx and ddy are used to resolve mipmap sampling artifacts when the texture wraps around.
+		colorX = tex2D(triplanarMap, frac(samplePosition.zy) * uvRangeMultiplier + uvOffset, ddx(samplePosition.z), ddy(samplePosition.y));
+		colorY = tex2D(triplanarMap, frac(samplePosition.xz) * uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.z));
+		colorZ = tex2D(triplanarMap, frac(samplePosition.xy) * uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.y));
+	}
 
 	return colorX * blendWeights.x + colorY * blendWeights.y + colorZ * blendWeights.z;
 }
