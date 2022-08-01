@@ -2,6 +2,7 @@
 #define STEREO_CANCER_PARAMETERS
 
 int _ParticleSystem;
+int _DisableNameplates;
 float _CoordinateSpace;
 float _CoordinateScale;
 float _WorldSamplingMode;
@@ -67,6 +68,8 @@ int	_DisplacementMapCount;
 int	_DisplacementMapIndex;
 float _DisplacementMapAngle;
 float _DisplacementMapIntensity;
+float _DisplacementMapOscillationSpeed;
+int _DisplacementMapIterations;
 int _DisplacementMapClamp;
 int _DisplacementMapCutOut;
 int _DisplacementMapScaleWithDistance;
@@ -198,6 +201,13 @@ float _CosWaveDensity;
 float _CosWaveAmplitude;
 float _CosWaveOffset;
 
+float _SinCosWaveAngle;
+float _SinCosWaveSinDensity;
+float _SinCosWaveCosDensity;
+float _SinCosWaveAmplitude;
+float _SinCosWaveSinOffset;
+float _SinCosWaveCosOffset;
+
 float _TanWaveAngle;
 float _TanWaveDensity;
 float _TanWaveAmplitude;
@@ -298,6 +308,7 @@ float _BlurMovementSampleCount;
 float _BlurMovementTarget;
 float _BlurMovementRange;
 float _BlurMovementExtrapolation;
+float _BlurMovementBlurIntensity;
 float _BlurMovementOpacity;
 float _BlurMovementBlend;
 

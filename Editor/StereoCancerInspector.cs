@@ -45,6 +45,7 @@ public class StereoCancerGUI : ShaderGUI
     bool displayDistortionZigZag = false;
     bool displayDistortionSinWave = false;
     bool displayDistortionCosWave = false;
+    bool displayDistortionSinCosWave = false;
     bool displayDistortionTanWave = false;
     bool displayDistortionSlice = false;
     bool displayDistortionRipple = false;
@@ -89,6 +90,8 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CullMode = null;
     MaterialProperty _ZWrite = null;
     MaterialProperty _ZTest = null;
+
+    MaterialProperty _DisableNameplates = null;
 
     MaterialProperty _StencilRef = null;
     MaterialProperty _StencilComp = null;
@@ -169,6 +172,8 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _DisplacementMapIndex = null;
     MaterialProperty _DisplacementMapAngle = null;
     MaterialProperty _DisplacementMapIntensity = null;
+    MaterialProperty _DisplacementMapOscillationSpeed = null;
+    MaterialProperty _DisplacementMapIterations = null;
     MaterialProperty _DisplacementMapClamp = null;
     MaterialProperty _DisplacementMapCutOut = null;
     MaterialProperty _DisplacementMapScaleWithDistance = null;
@@ -300,6 +305,13 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _CosWaveAmplitude = null;
     MaterialProperty _CosWaveOffset = null;
 
+    MaterialProperty _SinCosWaveAngle = null;
+    MaterialProperty _SinCosWaveSinDensity = null;
+    MaterialProperty _SinCosWaveCosDensity = null;
+    MaterialProperty _SinCosWaveAmplitude = null;
+    MaterialProperty _SinCosWaveSinOffset = null;
+    MaterialProperty _SinCosWaveCosOffset = null;
+
     MaterialProperty _TanWaveAngle = null;
     MaterialProperty _TanWaveDensity = null;
     MaterialProperty _TanWaveAmplitude = null;
@@ -400,6 +412,7 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _BlurMovementTarget = null;
     MaterialProperty _BlurMovementRange = null;
     MaterialProperty _BlurMovementExtrapolation = null;
+    MaterialProperty _BlurMovementBlurIntensity = null;
     MaterialProperty _BlurMovementOpacity = null;
     MaterialProperty _BlurMovementBlend = null;
 
@@ -612,6 +625,9 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_ZTest, new GUIContent("Z Test", "Select if pixels from this object should be discarded when an object is closer than the pixel. This should be set to Always for fullscreen Object Display Mode, and LessEqual for world scale."));
             GUILayout.Space(20);
 
+            materialEditor.ShaderProperty(_DisableNameplates, new GUIContent("Disable Nameplates (Requires Z Write)", "Writes the nearest possible depth to prevent nameplates from displaying."));
+            GUILayout.Space(20);
+
             materialEditor.ShaderProperty(_CancerDisplayMode, new GUIContent("Cancer Display Mode", "Select if cancer effects should be selectively displayed on the screen, mirrors, or both."));
             materialEditor.ShaderProperty(_ObjectDisplayMode, new GUIContent("Object Display Mode", "Select if cancer object should fully cover the viewers screen, or displayed in the world like a normal object."));
             materialEditor.ShaderProperty(_DisplayOnSurface, new GUIContent("Display On Surface", "Select if the cancer effects should be displayed on the surface of the object like a texture."));
@@ -767,6 +783,9 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_DisplacementMapIndex, new GUIContent("Displacement Map Index", "The current index of the image in the potentially packed texture."));
             materialEditor.ShaderProperty(_DisplacementMapAngle, new GUIContent("Displacement Map Angle", "Adjust the rotation of the displacement map."));
             materialEditor.ShaderProperty(_DisplacementMapIntensity, new GUIContent("Displacement Map Distance", "Adjust the maximum distance of the displacement map."));
+            materialEditor.ShaderProperty(_DisplacementMapOscillationSpeed, new GUIContent("Displacement Map Oscillation Speed", "Adjust the speed that the displacement oscillates between positive and negative values."));
+            materialEditor.ShaderProperty(_DisplacementMapIterations, new GUIContent("Displacement Map Iterations", "Adjust how many times the displacement map is sampled. Different values will result in different patterns, so this value shouldn't be simply left at the minimum or maximum amounts."));
+            
             materialEditor.ShaderProperty(_DisplacementMapClamp, new GUIContent("Displacement Map Clamp", "Select 'Yes' if the displacement map should be clamped to the edge pixels."));
             materialEditor.ShaderProperty(_DisplacementMapCutOut, new GUIContent("Displacement Map Cutout", "Select 'Yes' if the displacement map should be cutout."));
 
@@ -951,6 +970,18 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_CosWaveDensity, new GUIContent("Cos Wave Density", "Adjust the distance between the cosine wave direction changes."));
                 materialEditor.ShaderProperty(_CosWaveAmplitude, new GUIContent("Cos Wave Distance", "Adjust how far the cosine wave shifts the screen."));
                 materialEditor.ShaderProperty(_CosWaveOffset, new GUIContent("Cos Wave Offset", "Adjust the offset of the cosine wave points."));
+            }
+
+            displayDistortionSinCosWave = EditorGUILayout.Foldout(displayDistortionSinCosWave, "SinCos Wave", true, scFoldoutStyle);
+
+            if (displayDistortionSinCosWave)
+            {
+                materialEditor.ShaderProperty(_SinCosWaveAngle, new GUIContent("SinCos Wave Angle", "Adjust the angle of the horizontal screen sincos wave."));
+                materialEditor.ShaderProperty(_SinCosWaveSinDensity, new GUIContent("SinCos Wave Sin Density", "Adjust the distance between the sin portion of the sincos wave direction changes."));
+                materialEditor.ShaderProperty(_SinCosWaveCosDensity, new GUIContent("SinCos Wave Cos Density", "Adjust the distance between the cos portion of the sincos wave direction changes."));
+                materialEditor.ShaderProperty(_SinCosWaveAmplitude, new GUIContent("SinCos Wave Distance", "Adjust how far the sincos wave shifts the screen."));
+                materialEditor.ShaderProperty(_SinCosWaveSinOffset, new GUIContent("SinCos Wave Sin Offset", "Adjust the offset of the sin portion of the wave points."));
+                materialEditor.ShaderProperty(_SinCosWaveCosOffset, new GUIContent("SinCos Wave Cos Offset", "Adjust the offset of the cos portion of the wave points."));
             }
 
             displayDistortionTanWave = EditorGUILayout.Foldout(displayDistortionTanWave, "Tan Wave", true, scFoldoutStyle);
@@ -1170,6 +1201,7 @@ public class StereoCancerGUI : ShaderGUI
                 materialEditor.ShaderProperty(_BlurMovementTarget, new GUIContent("Movement Target Position", "Adjust the target position between the pixels starting and ending position."));
                 materialEditor.ShaderProperty(_BlurMovementRange, new GUIContent("Movement Range", "Adjust how much of the pixels movement is blurred together."));
                 materialEditor.ShaderProperty(_BlurMovementExtrapolation, new GUIContent("Movement Extrapolation", "Adjust how much movement of the pixel can be extrapolated past its starting or ending points."));
+                materialEditor.ShaderProperty(_BlurMovementBlurIntensity, new GUIContent("Movement Blur Amount", "Adjust how much the samples are blurred together. Setting to 0 allows for immitating the classic PS2 era boss zoom blur."));
                 materialEditor.ShaderProperty(_BlurMovementOpacity, new GUIContent("Movement Opacity", "Adjust how much the blur is blended onto the screen."));
                 materialEditor.ShaderProperty(_BlurMovementBlend, new GUIContent("Movement Blend", "Adjust how much the blur is blended with the screen. Use values less than 1 to combine with Chromatic Aberration or RGB Distortion Desync."));
             }

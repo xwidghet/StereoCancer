@@ -41,6 +41,9 @@ Shader "xwidghet/StereoCancer v0.1"
 		[Enum(Off, 0, On, 1)] _ZWrite("Z Write", Int) = 0
 		[Enum(UnityEngine.Rendering.CompareFunction)] _ZTest("Z Test", Int) = 8
 
+		// VRChat workarounds
+		[Enum(No, 0, Yes,1)] _DisableNameplates("Disable Nameplates", Int) = 0
+
 		[Enum(Screen,0, Mirror,1, Both,2)] _CancerDisplayMode("Cancer Display Mode", Float) = 0
 		[Enum(Fullscreen,0, World Scale,1)] _ObjectDisplayMode("Object Display Mode", Float) = 0
 		[Enum(No, 0, Yes,1)] _DisplayOnSurface("Display On Surface", Float) = 0
@@ -119,6 +122,8 @@ Shader "xwidghet/StereoCancer v0.1"
 		_DisplacementMapIndex("Displacement Map Index", Int) = 0
 		_DisplacementMapAngle("Displacement Map Angle", Float) = 0
 		_DisplacementMapIntensity("Displacement Map Intensity", Float) = 0
+		_DisplacementMapOscillationSpeed("Displacement Map Oscillation Speed", Float) = 0
+		_DisplacementMapIterations("Displacement Map Iterations", Range(1,30)) = 1
 		[Enum(No,0, Yes,1)] _DisplacementMapClamp("Displacement Map Clamp", Int) = 0
 		[Enum(No,0, Yes,1)] _DisplacementMapCutOut("Displacement Map Cut Out", Int) = 0
 		[Enum(No,0, Yes,1)] _DisplacementMapScaleWithDistance("Displacement Map Scale With Distance", Int) = 0
@@ -221,6 +226,13 @@ Shader "xwidghet/StereoCancer v0.1"
 		_CosWaveAmplitude("Cos Wave Amplitude", Float) = 0
 		_CosWaveOffset("Cos Wave Offset", Float) = 0
 
+		_SinCosWaveAngle("SinCos Wave Angle", Float) = 0
+		_SinCosWaveSinDensity("SinCos Wave  Sin Density", Float) = 10
+		_SinCosWaveCosDensity("SinCos Wave  Cos Density", Float) = 10
+		_SinCosWaveAmplitude("SinCos Wave Amplitude", Float) = 0
+		_SinCosWaveSinOffset("SinCos Wave Sin Offset", Float) = 0
+		_SinCosWaveCosOffset("SinCos Wave Cos Offset", Float) = 0
+
 		_TanWaveAngle("Tan Wave Angle", Float) = 0
 		_TanWaveDensity("Tan Wave Density", Float) = 10
 		_TanWaveAmplitude("Tan Wave Amplitude", Float) = 0
@@ -313,6 +325,7 @@ Shader "xwidghet/StereoCancer v0.1"
 		_BlurMovementTarget("Blur Movement Target", Range(0, 1)) = 0.5
 		_BlurMovementRange("Blur Movement Range", Range(0.001, 1)) = 1
 		_BlurMovementExtrapolation("Blur Movement Extrapolation", Range(0, 1)) = 0
+		_BlurMovementBlurIntensity("Blur Movement Blur Intensity", Range(0, 1)) = 1
 		_BlurMovementOpacity("Blur Movement Opacity", Range(0, 1)) = 0
 		_BlurMovementBlend("Blur Movement Blend", Range(-1, 1)) = 1
 
@@ -397,7 +410,7 @@ Shader "xwidghet/StereoCancer v0.1"
 		// Opaque = 2000, Transparent = 3000, Overlay = 4000
 		// Note: As of VRChat 2018 update, object draws are clamped
 		//		 to render queue 4000, and particles to 5000.
-		Tags { "Queue" = "Overlay" }
+		Tags { "Queue" = "Overlay" "IgnoreProjector" = "True" "VRCFallback" = "Hidden" }
 
 		// Don't write depth, and ignore the current depth.
 		Cull[_CullMode] ZWrite[_ZWrite] ZTest[_ZTest]
@@ -647,8 +660,12 @@ Shader "xwidghet/StereoCancer v0.1"
 				return o;
 			}
 
-			fixed4 frag(v2f i) : SV_Target
+			fixed4 frag(v2f i, out float depth : SV_DEPTH) : SV_Target
 			{
+				// VRChat displays nameplates beyond queue 4000 with depth testing enabled,
+				// so we can remove them by writting the nearest depth.
+				depth = _DisableNameplates ? 1 : i.pos.z;
+
 				if (_DisplayOnSurface)
 				{
 					// Normally the normalization inverts the coordinates since view-space Z is negative,
@@ -769,9 +786,9 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_ShrinkWidth != 0)
 					i.viewPos.x += i.viewPos.x*(_ShrinkWidth * 0.02);
-
+				
 				UNITY_BRANCH
-				if(_RotationX != 0)
+				if (_RotationX != 0)
 					i.viewPos.zy = rotate2D(i.viewPos.zy, _RotationX);
 				UNITY_BRANCH
 				if (_RotationY != 0)
@@ -779,7 +796,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_RotationZ != 0)
 					i.viewPos.xy = rotate2D(i.viewPos.xy, _RotationZ);
-
+				
 				i.viewPos.xyz += float3(_MoveX, _MoveY, _MoveZ);
 
 				UNITY_BRANCH
@@ -793,180 +810,109 @@ Shader "xwidghet/StereoCancer v0.1"
 					// Since this function sets clearPixel for pixels inside the split
 					// we need to scale the split point to syncronize with distortion
 					// falloff.
-					float flipPoint = i.viewPos.x/i.colorDistortionFalloff.y;
-					UNITY_BRANCH
-					if (_SplitXAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _SplitXAngle).x;
+					float flipPoint = rotate2D(i.viewPos.xy/i.colorDistortionFalloff.y, _SplitXAngle).x;
 
 					i.viewPos = stereoSplit(i.viewPos, axisRight, flipPoint, _SplitXDistance, _SplitXHalf, clearPixel);
 				}
 				UNITY_BRANCH
 				if (_SplitYDistance != 0)
 				{
-					float flipPoint = i.viewPos.y/i.colorDistortionFalloff.y;
-					UNITY_BRANCH
-					if (_SplitYAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _SplitYAngle).y;
+					float flipPoint = rotate2D(i.viewPos.xy/i.colorDistortionFalloff.y, _SplitYAngle).y;
 
 					i.viewPos = stereoSplit(i.viewPos, axisUp, flipPoint, _SplitYDistance, _SplitYHalf, clearPixel);
 				}
 
-				// At interval of 0 the screen will be blank,
-				// so we must check both distance and interval
 				UNITY_BRANCH
-				if (_SkewXDistance != 0 && _SkewXInterval != 0)
+				if (_SkewXDistance != 0)
 				{
-					UNITY_BRANCH
-					if(_SkewXAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _SkewXAngle);
-
-					i.viewPos = stereoSkew(i.viewPos, axisRight, i.viewPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
-
-					UNITY_BRANCH
-					if (_SkewXAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_SkewXAngle);
+					i.viewPos.xyz += stereoSkew(rotate2D(i.viewPos.xy, _SkewXAngle), axisRight, i.viewPos.y, _SkewXInterval, _SkewXDistance, _SkewXOffset);
 				}
 				UNITY_BRANCH
-				if (_SkewYDistance != 0 && _SkewYInterval != 0)
+				if (_SkewYDistance != 0)
 				{
-					UNITY_BRANCH
-					if (_SkewYAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _SkewYAngle);
-
-					i.viewPos = stereoSkew(i.viewPos, axisUp, i.viewPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
-
-					UNITY_BRANCH
-					if (_SkewYAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_SkewYAngle);
+					i.viewPos.xyz += stereoSkew(rotate2D(i.viewPos.xy, _SkewYAngle), axisUp, i.viewPos.x, _SkewYInterval, _SkewYDistance, _SkewYOffset);
 				}
 
 				UNITY_BRANCH
 				if (_BarXDistance != 0)
 				{
-					float flipPoint = i.viewPos.y;
-					UNITY_BRANCH
-					if (_BarXAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _BarXAngle).y;
+					float flipPoint = rotate2D(i.viewPos.xy, _BarXAngle).y;
 
-					i.viewPos = stereoBar(i.viewPos, axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
+					i.viewPos.xyz += stereoBar(axisRight, flipPoint, _BarXInterval, _BarXOffset, _BarXDistance);
 				}
 				UNITY_BRANCH
 				if (_BarYDistance != 0)
 				{
-					float flipPoint = i.viewPos.x;
-					UNITY_BRANCH
-					if (_BarYAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _BarYAngle).x;
+					float flipPoint = rotate2D(i.viewPos.xy, _BarYAngle).x;
 
-					i.viewPos = stereoBar(i.viewPos, axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
+					i.viewPos.xyz += stereoBar(axisUp, flipPoint, _BarYInterval, _BarYOffset, _BarYDistance);
 				}
 
 				UNITY_BRANCH
-				if (_SinBarXDistance != 0 && _SinBarXInterval != 0)
+				if (_SinBarXDistance != 0)
 				{
-					float flipPoint = i.viewPos.y;
-					UNITY_BRANCH
-					if (_SinBarXAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _SinBarXAngle).y;
+					float flipPoint = rotate2D(i.viewPos.xy, _SinBarXAngle).y;
 
-					i.viewPos = stereoSinBar(i.viewPos, axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
+					i.viewPos.xyz += stereoSinBar(axisRight, flipPoint, _SinBarXInterval, _SinBarXOffset, _SinBarXDistance);
 				}
 				UNITY_BRANCH
-				if (_SinBarYDistance != 0 && _SinBarYInterval != 0)
+				if (_SinBarYDistance != 0)
 				{
-					float flipPoint = i.viewPos.x;
-					UNITY_BRANCH
-					if (_SinBarYAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _SinBarYAngle).x;
+					float flipPoint = rotate2D(i.viewPos.xy, _SinBarYAngle).x;
 
-					i.viewPos = stereoSinBar(i.viewPos, axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
+					i.viewPos.xyz += stereoSinBar(axisUp, flipPoint, _SinBarYInterval, _SinBarYOffset, _SinBarYDistance);
 				}
 
 				UNITY_BRANCH
 				if (_MeltDistance != 0)
 				{
-					UNITY_BRANCH
-					if (_MeltAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _MeltAngle);
-
-					i.viewPos = stereoMelt(i.viewPos, _MeltInterval, _MeltVariance, _MeltSeed, _MeltDistance, _MeltBothDirections);
-
-					UNITY_BRANCH
-					if (_MeltAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_MeltAngle);
+					i.viewPos.xy += rotate2D(float2(0,1), _MeltAngle) * stereoMelt(rotate2D(i.viewPos.xy, _MeltAngle), _MeltInterval, _MeltVariance, _MeltSeed, _MeltDistance, _MeltBothDirections);
 				}
 
 				UNITY_BRANCH
-				if (_ZigZagXDensity != 0)
+				if (_ZigZagXAmplitude != 0)
 				{
-					float flipPoint = i.viewPos.y;
-					UNITY_BRANCH
-					if (_ZigZagXAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _ZigZagXAngle).y;
+					float flipPoint = rotate2D(i.viewPos.xy, _ZigZagXAngle).y;
 
 					i.viewPos = stereoZigZag(i.viewPos, axisRight, flipPoint, _ZigZagXDensity, _ZigZagXAmplitude, _ZigZagXOffset);
 				}
 				UNITY_BRANCH
-				if (_ZigZagYDensity != 0)
+				if (_ZigZagYAmplitude != 0)
 				{
-					float flipPoint = i.viewPos.x;
-					UNITY_BRANCH
-					if (_ZigZagYAngle != 0)
-						flipPoint = rotate2D(i.viewPos.xy, _ZigZagYAngle).x;
+					float flipPoint = rotate2D(i.viewPos.xy, _ZigZagYAngle).x;
 
 					i.viewPos = stereoZigZag(i.viewPos, axisUp, flipPoint, _ZigZagYDensity, _ZigZagYAmplitude, _ZigZagYOffset);
 				}
 
 				UNITY_BRANCH
-				if (_SinWaveDensity != 0)
+				if (_SinWaveAmplitude != 0 && _SinWaveAmplitude != 0)
 				{
-					float3 axis = axisRight;
-					UNITY_BRANCH
-					if (_SinWaveAngle != 0)
-					{
-						axis.xy = rotate2D(axis.xy, _SinWaveAngle);
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _SinWaveAngle);
-					}
+					float3 axis = float3(rotate2D(axisRight.xy, _SinWaveAngle), axisRight.z);
 
-					i.viewPos = stereoSinWave(i.viewPos, axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
-
-					UNITY_BRANCH
-					if (_SinWaveAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_SinWaveAngle);
+					i.viewPos.xyz += stereoSinWave(rotate2D(i.viewPos.xy, _SinWaveAngle), axis, _SinWaveDensity / 100, _SinWaveAmplitude, _SinWaveOffset);
 				}
 				UNITY_BRANCH
-				if (_CosWaveDensity != 0)
+				if (_CosWaveAmplitude != 0 && _CosWaveAmplitude != 0)
 				{
-					float3 axis = axisUp;
-					UNITY_BRANCH
-					if (_CosWaveAngle != 0)
-					{
-						axis.xy = rotate2D(axis.xy, _CosWaveAngle);
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _CosWaveAngle);
-					}
+					float3 axis = float3(rotate2D(axisUp.xy, _CosWaveAngle), axisUp.z);
 
-					i.viewPos = stereoCosWave(i.viewPos, axis, _CosWaveDensity / 100, _CosWaveAmplitude, _CosWaveOffset);
-
-					UNITY_BRANCH
-					if (_CosWaveAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_CosWaveAngle);
+					i.viewPos.xyz += stereoCosWave(rotate2D(i.viewPos.xy, _CosWaveAngle), axis, _CosWaveDensity / 100, _CosWaveAmplitude, _CosWaveOffset);
 				}
+
 				UNITY_BRANCH
-				if (_TanWaveDensity != 0)
+				if (_SinCosWaveAmplitude != 0 && _SinCosWaveAmplitude != 0)
 				{
-					float3 axis = axisRight;
-					UNITY_BRANCH
-					if (_TanWaveAngle != 0)
-					{
-						axis.xy = rotate2D(axis.xy, _TanWaveAngle);
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _TanWaveAngle);
-					}
+					float3 axis = float3(rotate2D(axisRight.xy, _SinCosWaveAngle), axisRight.z);
 
-					i.viewPos = stereoTanWave(i.viewPos, axisRight, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
+					i.viewPos.xyz += stereoSinCosWave(rotate2D(i.viewPos.xy, _SinCosWaveAngle), axis, _SinCosWaveSinDensity / 100, _SinCosWaveCosDensity / 100, _SinCosWaveAmplitude, _SinCosWaveSinOffset, _SinCosWaveCosOffset);
+				}
 
-					UNITY_BRANCH
-					if (_TanWaveAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_TanWaveAngle);
+				UNITY_BRANCH
+				if (_TanWaveDensity != 0 && _TanWaveAmplitude != 0)
+				{
+					float3 axis = float3(rotate2D(axisRight.xy, _TanWaveAngle), axisRight.z);
+
+					i.viewPos.xyz += stereoTanWave(rotate2D(i.viewPos.xy, _TanWaveAngle), axis, _TanWaveDensity / 100, _TanWaveAmplitude, _TanWaveOffset);
 				}
 
 				UNITY_BRANCH
@@ -978,7 +924,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					i.viewPos = stereoRipple(i.viewPos, axisFront, _RippleDensity / 100, _RippleAmplitude, _RippleOffset, _RippleInnerFalloff, _RippleOuterFalloff);
 
 				UNITY_BRANCH
-				if (_CheckerboardScale != 0)
+				if (_CheckerboardShift != 0)
 					i.viewPos = stereoCheckerboard(i.viewPos, axisFront, _CheckerboardAngle, _CheckerboardScale, _CheckerboardShift);
 
 				UNITY_BRANCH
@@ -1003,7 +949,7 @@ Shader "xwidghet/StereoCancer v0.1"
 
 				UNITY_BRANCH
 				if(_FishEyeIntensity != 0)
-					i.viewPos = stereoFishEye(i.viewPos, axisFront, _FishEyeIntensity);
+					i.viewPos.xyz += stereoFishEye(i.viewPos, axisFront, _FishEyeIntensity);
 
 				UNITY_BRANCH
 				if(_KaleidoscopeSegments > 0)
@@ -1011,41 +957,30 @@ Shader "xwidghet/StereoCancer v0.1"
 
 				UNITY_BRANCH
 				if (_BlockDisplacementSize != 0)
-				{
-					UNITY_BRANCH
-					if (_BlockDisplacementAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _BlockDisplacementAngle);
-
-					i.viewPos = stereoBlockDisplacement(i.viewPos, _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
-
-					UNITY_BRANCH
-					if (_BlockDisplacementAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_BlockDisplacementAngle);
-				}
-
-				// Think you have enough function parameters there buddy?
+					i.viewPos.xy += stereoBlockDisplacement(rotate2D(i.viewPos.xy, _BlockDisplacementAngle), _BlockDisplacementSize, _BlockDisplacementIntensity, _BlockDisplacementMode, _BlockDisplacementOffset, clearPixel);
+				
 				UNITY_BRANCH
 				if (_GlitchCount != 0 && _GlitchIntensity != 0)
 				{
-					UNITY_BRANCH
-					if (_GlitchAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, _GlitchAngle);
-
-					i.viewPos = stereoGlitch(i.viewPos, axisFront, axisRight, axisUp,
+					// Think you have enough function parameters there buddy?
+					i.viewPos.xyz += stereoGlitch(float3(rotate2D(i.viewPos.xy, _GlitchAngle), i.viewPos.z), axisFront, axisRight, axisUp,
 						_GlitchCount, _MinGlitchWidth, _MinGlitchHeight, _MaxGlitchWidth, 
 						_MaxGlitchHeight, _GlitchIntensity, _GlitchSeed, _GlitchSeedInterval);
-
-					UNITY_BRANCH
-					if (_GlitchAngle != 0)
-						i.viewPos.xy = rotate2D(i.viewPos.xy, -_GlitchAngle);
 				}
 
 				UNITY_BRANCH
-				if(_NoiseScale != 0 && _NoiseStrength != 0)
-					i.viewPos.xyz += snoise((i.viewPos.xyz + axisFront*_NoiseOffset) / _NoiseScale)*_NoiseStrength;
+				if (_NoiseStrength != 0)
+				{
+					float noiseScale = abs(_NoiseScale) > 0.00001 ? _NoiseScale : 0.00001;
+					i.viewPos.xyz += snoise((i.viewPos.xyz + axisFront * _NoiseOffset) / noiseScale) * _NoiseStrength;
+				}
+					
 				UNITY_BRANCH
-				if (_VoroniNoiseScale != 0 && (_VoroniNoiseStrength != 0 || _VoroniNoiseBorderStrength != 0))
-					i.viewPos = stereoVoroniNoise(i.viewPos, _VoroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
+				if (_VoroniNoiseStrength != 0 || _VoroniNoiseBorderStrength != 0)
+				{
+					float voroniNoiseScale = abs(_VoroniNoiseScale) > 0.00001 ? _VoroniNoiseScale : 0.00001;
+					i.viewPos = stereoVoroniNoise(i.viewPos, voroniNoiseScale, _VoroniNoiseOffset, _VoroniNoiseStrength, _VoroniNoiseBorderSize, _VoroniNoiseBorderMode, _VoroniNoiseBorderStrength, clearPixel);
+				}
 					
 				UNITY_BRANCH
 				if (_FanDistance != 0 && _FanScale != 0)
@@ -1059,37 +994,49 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_DisplacementMapIntensity != 0)
 				{
-					float4 samplePosition = i.viewPos;
-					if (_DisplacementMapAngle != 0)
-						samplePosition.xy = rotate2D(samplePosition.xy, _DisplacementMapAngle);
+					UNITY_LOOP
+					for (int q = 0; q < _DisplacementMapIterations; q++)
+					{
+						float4 samplePosition = i.viewPos;
+						if (_DisplacementMapAngle != 0)
+							samplePosition.xy = rotate2D(samplePosition.xy, _DisplacementMapAngle);
 
-					samplePosition.xy *= 1 + _DisplacementMapScaleWithDistance*distance(i.centerCamPos, i.objPos);
+						samplePosition.xy *= 1 + _DisplacementMapScaleWithDistance * distance(i.centerCamPos, i.objPos);
 
-					bool dropDistortion = false;
-					half4 displacementVector = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
-						_DisplacementMap, _DisplacementMap_ST, _DisplacementMap_TexelSize,
-						_DisplacementMapColumns, _DisplacementMapRows, _DisplacementMapCount, _DisplacementMapIndex,
-						_DisplacementMapClamp, _DisplacementMapCutOut,
-						dropDistortion);
+						bool dropDistortion = false;
+						half4 displacementVector = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
+							_DisplacementMap, _DisplacementMap_ST, _DisplacementMap_TexelSize,
+							_DisplacementMapColumns, _DisplacementMapRows, _DisplacementMapCount, _DisplacementMapIndex,
+							_DisplacementMapClamp, _DisplacementMapCutOut,
+							dropDistortion);
 
-					float displacementAmount = (!dropDistortion)*_DisplacementMapIntensity;
+						float displacementAmount = (!dropDistortion) * _DisplacementMapIntensity;
 
-					// Interpret displacement map using the screen as a surface
-					// Red = Left-Right
-					// Green = Forward-Back
-					// Blue = Up-Down
+						// Interpret displacement map using the screen as a surface
+						// Red = Left-Right
+						// Green = Forward-Back
+						// Blue = Up-Down
 
-					// Normal Map
-					if (_DisplacementMapType == 0)
-						i.viewPos.xyz += UnpackNormal(displacementVector).xyz*displacementAmount;
-					// Color
-					// Textures are 8 bits per color, so in order to have a '0' distortion value
-					// we need to calculate the origin from 127/255.
-					//
-					// Note: This assumes the user has unchecked the 'sRGB (Color Texture)' box
-					//		 for their texture.
-					else
-						i.viewPos.xyz += (displacementVector.xzy - 0.4980392)*displacementAmount;
+						// Normal Map
+						if (_DisplacementMapType == 0)
+							displacementVector.xyz = UnpackNormal(displacementVector).xyz;
+						// Color
+						// Textures are 8 bits per color, so in order to have a '0' distortion value
+						// we need to calculate the origin from 127/255.
+						//
+						// Note: This assumes the user has unchecked the 'sRGB (Color Texture)' box
+						//		 for their texture.
+						else
+							displacementVector.xyz = (displacementVector.xzy - 0.4980392);
+
+						// Since cos is a symetrical function we can add our displacement to its input value
+						// to create a wobble which changes interval based on the distortion. This makes it
+						// much more interesting to look at than a global sin/cos multiplication.
+						if (_DisplacementMapOscillationSpeed != 0)
+							displacementVector.xyz += cos(UNITY_TWO_PI * frac((_Time.x * _DisplacementMapOscillationSpeed) + (q+1)*rcp(_DisplacementMapIterations)) + UNITY_TWO_PI*displacementVector.xyz);
+
+						i.viewPos.xyz += displacementVector.xyz * (displacementAmount * rcp(_DisplacementMapIterations));
+					}
 				}
 
 				// Shift world pos back from its current axis-aligned position to
@@ -1254,6 +1201,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				}
 
 				// Apply falloff to distortion
+				UNITY_BRANCH
 				if (i.colorDistortionFalloff.y < 1)
 				{
 					i.viewPos.xyz = lerp(startingAxisAlignedPos.xyz, i.viewPos.xyz, i.colorDistortionFalloff.y);
@@ -1277,7 +1225,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				}
 
 				UNITY_BRANCH
-				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0 || any(_CancerEffectRange != 1.f))
+				if (any(_CancerEffectOffset.xyz) || _CancerEffectRotation != 0 || _CancerEffectRange != 1.f)
 				{
 					i.viewPos.xyz -= cancerEffectWrapVector*i.colorDistortionFalloff.y;
 
@@ -1317,11 +1265,9 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_ScreenSamplingMode == 1)
 					stereoPosition = clampUVCoordinates(stereoPosition);
-
 				// Wrapping allows for creating 'infinite' texture
 				// and tunnel effects.
-				UNITY_BRANCH
-				if (_ScreenSamplingMode == 2)
+				else if (_ScreenSamplingMode == 2)
 					stereoPosition = wrapUVCoordinates(stereoPosition);
 
 				  /////////////////////////
@@ -1347,7 +1293,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					if (_BlurMovementBlend != 0 && _BlurMovementOpacity != 0)
 					{
 						half3 blurColor = blurMovement(_stereoCancerTexture, startingWorldPos, worldCoordinates, _BlurMovementSampleCount,
-							_BlurMovementTarget, _BlurMovementRange, _BlurMovementExtrapolation, _BlurMovementOpacity);
+							_BlurMovementTarget, _BlurMovementRange, _BlurMovementExtrapolation, _BlurMovementBlurIntensity, _BlurMovementOpacity);
 						bgcolor.rgb = lerp(bgcolor.rgb, blurColor, _BlurMovementBlend);
 					}
 					UNITY_BRANCH
@@ -1442,7 +1388,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_EdgelordStripeSize != 0)
 				{
-					float2 edgelordUV = (i.viewPos.xyz / i.viewPos.w).xy;
+					float2 edgelordUV = (i.viewPos.xy / i.viewPos.w);
 					bgcolor = edgelordStripes(edgelordUV, bgcolor, _EdgelordStripeColor, _EdgelordStripeSize, _EdgelordStripeOffset);
 				}
 

@@ -110,7 +110,7 @@ float snoise(float3 v)
     m = m * m;
 
     float4 px = float4(dot(x0, g0), dot(x1, g1), dot(x2, g2), dot(x3, g3));
-    return 42.0 * dot(m, px);
+    return 42.0 * clamp(dot(m, px), -1, 1);
 }
 
 float4 snoise_grad(float3 v)

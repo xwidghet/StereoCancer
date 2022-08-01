@@ -271,27 +271,27 @@ float4 stereoSplit(float4 worldPos, float3 axis, float splitPoint, float distanc
 	return worldPos;
 }
 
-float4 stereoBar(float4 worldPos, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
+float3 stereoBar(float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
 	float quantizedPoint = fmod(abs(flipPoint) + interval / 2 + offset, interval * 2);
 	float dir = quantizedPoint < interval ? -1 : 1;
 
-	worldPos.xyz += dir * moveAxis * distance;
-
-	return worldPos;
+	return dir * moveAxis * distance;
 }
 
-float4 stereoSinBar(float4 worldPos, float3 moveAxis, float flipPoint, float interval, float offset, float distance)
+float3 stereoSinBar(float3 moveAxis, float flipPoint, float interval, float offset, float distance)
 {
+	// Ensure the effect doesn't disappear for one frame when interpolating the interval parameter
+	// across zero.
+	interval = abs(interval) > 0.00001 ? interval : 0.00001;
+
 	flipPoint = floor(flipPoint / interval);
 	float dir = sin(flipPoint + offset);
 
-	worldPos.xyz += dir * moveAxis * distance;
-
-	return worldPos;
+	return dir * moveAxis * distance;
 }
 
-float4 stereoMelt(float4 worldPos, float interval, float variance, float seed, float distance, float bothDirections)
+float stereoMelt(float2 worldPos, float interval, float variance, float seed, float distance, float bothDirections)
 {
 	float displacement = floor(worldPos.x / interval);
 	displacement = rand1dTo1d(displacement + seed);
@@ -303,10 +303,8 @@ float4 stereoMelt(float4 worldPos, float interval, float variance, float seed, f
 	dir = dir != 0 ? dir : 1;
 
 	displacement = displacement * variance + dir*(1.0 - variance)*0.5;
-
-	worldPos.y += displacement * distance;
 	
-	return worldPos;
+	return displacement * distance;
 }
 
 float4 stereoWarp(float4 worldPos, float3 camFront, float angle, float intensity)
@@ -328,8 +326,12 @@ float4 stereoZoom(float4 worldCoordinates, float3 camFront, float distance)
 	return ComputeGrabScreenPos(screenCoords);
 }
 
-float4 stereoSkew(float4 worldCoordinates, float3 moveAxis, float flipPoint, float interval, float distance, float offset)
+float3 stereoSkew(float2 worldCoordinates, float3 moveAxis, float flipPoint, float interval, float distance, float offset)
 {
+	// Ensure the effect doesn't disappear for one frame when interpolating the interval parameter
+	// across zero.
+	interval = abs(interval) > 0.00001 ? interval : 0.00001;
+
 	float intPosY = floor(abs(flipPoint));
 	float skewDir = -1 + 2 * step(1, (intPosY % 2));
 
@@ -338,23 +340,22 @@ float4 stereoSkew(float4 worldCoordinates, float3 moveAxis, float flipPoint, flo
 
 	skewVal *= distance;
 
-	worldCoordinates.xyz += moveAxis * skewVal;
-
-	return worldCoordinates;
+	return moveAxis * skewVal;
 }
 
 float4 fan(float4 worldCoordinates, float3 camRight, float3 camUp, float scale, float distance, float bladeCount, float offset)
 {
 	worldCoordinates /= scale;
-
 	const float skewInterval = 1;
+
+	UNITY_LOOP
 	for (int i = 0; i < bladeCount; i++)
 	{
-		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, skewInterval, distance, offset);
-		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, skewInterval, distance, offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camRight, worldCoordinates.y, skewInterval, distance, offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camUp, worldCoordinates.x, skewInterval, distance, offset);
 
-		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, -skewInterval, -distance, -offset);
-		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, -skewInterval, -distance, -offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camRight, worldCoordinates.y, -skewInterval, -distance, -offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camUp, worldCoordinates.x, -skewInterval, -distance, -offset);
 	}
 
 	return worldCoordinates * scale;
@@ -377,13 +378,14 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 	//
 	// (Though users are most likely to just crank quality to the max)
 	const float ditherInterval = 1;
+	UNITY_LOOP
 	for (int i = 0; i < quality; i++)
 	{
-		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, distance, offset);
-		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, distance, offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, distance, offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, distance, offset);
 
-		worldCoordinates = stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, -distance * 4, -offset);
-		worldCoordinates = stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, -distance * 4, -offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camRight, worldCoordinates.y, ditherInterval, -distance * 4, -offset);
+		worldCoordinates.xyz += stereoSkew(worldCoordinates, camUp, worldCoordinates.x, ditherInterval, -distance * 4, -offset);
 	}
 
 	return worldCoordinates / 10;
@@ -391,6 +393,10 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 
 float4 stereoCheckerboard(float4 coordinates, float3 axis, float angle, float scale, float shiftDistance)
 {
+	// Ensure the effect doesn't disappear for one frame when interpolating the scale parameter
+	// across zero.
+	scale = abs(scale) > 0.00001 ? scale : 0.00001;
+
 	float4 localCoordinates = coordinates;
 
 	UNITY_BRANCH
@@ -472,38 +478,32 @@ float4 stereoPolarInversion(float4 worldCoordinates, float intensity)
 	return worldCoordinates;
 }
 
-float4 stereoFishEye(float4 worldCoordinates, float3 camFront, float intensity)
+float3 stereoFishEye(float4 worldCoordinates, float3 camFront, float intensity)
 {
-	float3 worldVector = worldCoordinates.xyz;
-	float dist = length(worldVector);
-	worldVector = normalize(worldVector);
+	float3 worldVector = normalize(worldCoordinates.xyz);
+	float3 angleToWorldVector = acos(dot(worldVector, camFront));
 
-	float angleToWorldVector = acos(dot(worldVector, camFront));
-
-	worldCoordinates.xyz += camFront * (abs(angleToWorldVector) / UNITY_PI) * intensity;
-
-	return worldCoordinates;
+	return camFront * (abs(angleToWorldVector) / UNITY_PI) * intensity;
 }
 
-float4 stereoSinWave(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset)
+float3 stereoSinWave(float2 worldCoordinates, float3 axis, float density, float amplitude, float offset)
 {
-	worldCoordinates.xyz += axis * sin((worldCoordinates.y + offset) * density) * amplitude;
-
-	return worldCoordinates;
+	return axis * sin((worldCoordinates.y + offset) * density) * amplitude;
 }
 
-float4 stereoCosWave(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset)
+float3 stereoCosWave(float2 worldCoordinates, float3 axis, float density, float amplitude, float offset)
 {
-	worldCoordinates.xyz += axis * cos((worldCoordinates.x + offset) * density) * amplitude;
-
-	return worldCoordinates;
+	return axis * cos((worldCoordinates.x + offset) * density) * amplitude;
 }
 
-float4 stereoTanWave(float4 worldCoordinates, float3 axis, float density, float amplitude, float offset)
+float3 stereoSinCosWave(float2 worldCoordinates, float3 axis, float densitySin, float densityCos, float amplitude, float sinOffset, float cosOffset)
 {
-	worldCoordinates.xyz += axis * tan((worldCoordinates.y + offset) * density) * amplitude;
+	return axis * sin((worldCoordinates.x + sinOffset) * densitySin) * cos((worldCoordinates.y + cosOffset) * densityCos) * amplitude;
+}
 
-	return worldCoordinates;
+float3 stereoTanWave(float2 worldCoordinates, float3 axis, float density, float amplitude, float offset)
+{
+	return axis * tan((worldCoordinates.y + offset) * density) * amplitude;
 }
 
 float4 stereoSlice(float4 worldCoordinates, float3 axis, float angle, float width, float distance, float offset)
@@ -554,7 +554,7 @@ float4 stereoZigZag(float4 worldCoordinates, float3 moveAxis, float flipPoint, f
 	return worldCoordinates;
 }
 
-float4 stereoBlockDisplacement(float4 worldCoordinates, float blockSize, float intensity, float displacementMode, float seed, inout bool clearPixel)
+float2 stereoBlockDisplacement(float2 worldCoordinates, float blockSize, float intensity, float displacementMode, float seed, inout bool clearPixel)
 {
 	// HACK: snoise is not continous at exact intervals of 1, so I skip
 	//		 over the issue with an imperceptible jump.
@@ -580,12 +580,10 @@ float4 stereoBlockDisplacement(float4 worldCoordinates, float blockSize, float i
 
 	scale *= blockSize;
 
-	worldCoordinates.xy += (scale - blockSize / 2)*intensity;
-
-	return worldCoordinates;
+	return (scale - blockSize / 2) * intensity;
 }
 
-float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, float3 camUp, int glitchCount,
+float3 stereoGlitch(float3 worldCoordinates, float3 camFront, float3 camRight, float3 camUp, int glitchCount,
 	float minGlitchWidth, float minGlitchHeight, float maxGlitchWidth, float maxGlitchHeight, float glitchIntensity,
 	float seed, float seedInterval)
 {
@@ -600,6 +598,9 @@ float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, f
 	float spawnRangeY = 100 + (minGlitchHeight + distHeight / 2);
 	float halfSpawnRangeY = spawnRangeY * 0.5;
 
+	float3 startingPos = worldCoordinates;
+
+	UNITY_LOOP
 	for (int i = 0; i < glitchCount; i++)
 	{
 		// minX, maxX, minY, maxY
@@ -615,16 +616,16 @@ float4 stereoGlitch(float4 worldCoordinates, float3 camFront, float3 camRight, f
 		if (worldCoordinates.x >= boundingBox.x && worldCoordinates.x <= boundingBox.y
 			&& worldCoordinates.y >= boundingBox.z && worldCoordinates.y <= boundingBox.w)
 		{
-			worldCoordinates.xyz += camFront * (gold_noise(seed + 8, seed + 9) - 0.5) * glitchIntensity;
-			worldCoordinates.xyz += camRight * (gold_noise(seed + 10, seed + 11) - 0.5) * glitchIntensity;
-			worldCoordinates.xyz += camUp * (gold_noise(seed + 12, seed + 13) - 0.5) * glitchIntensity;
+			worldCoordinates += camFront * (gold_noise(seed + 8, seed + 9) - 0.5) * glitchIntensity;
+			worldCoordinates += camRight * (gold_noise(seed + 10, seed + 11) - 0.5) * glitchIntensity;
+			worldCoordinates += camUp * (gold_noise(seed + 12, seed + 13) - 0.5) * glitchIntensity;
 		}
 
 		// Don't share random values between glitch boxes
 		seed += 14;
 	}
 
-	return worldCoordinates;
+	return worldCoordinates - startingPos;
 }
 
 float4 stereoKaleidoscope(float4 worldCoordinates, float angle, float segments)
@@ -636,6 +637,7 @@ float4 stereoKaleidoscope(float4 worldCoordinates, float angle, float segments)
 	// every loop.
 	int i = 0;
 
+	UNITY_LOOP
 	for (; i < segments; i++)
 	{
 		worldCoordinates.x = abs(worldCoordinates.x);
@@ -979,7 +981,7 @@ half4 edgelordStripes(float2 uv, half4 bgColor, float4 stripeColor, float stripe
 }
 
 half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates, float4 finalWorldCoordinates, int sampleCount,
-	float targetPoint, float pointAdjustmentStrength, float extrapolation, float opacity)
+	float targetPoint, float pointAdjustmentStrength, float extrapolation, float blur, float opacity)
 {
 	float3 color = float3(0, 0, 0);
 
@@ -1012,7 +1014,7 @@ half3 blurMovement(sampler2D backgroundTexture, float4 startingWorldCoordinates,
 	for (int q = 0; q < sampleCount; q++)
 	{
 		float4 samplePos = float4(startingPoint.xyz + blurMovementVec * q, startingPoint.w);
-		float attenuation = 1.0 - distance(targetPosition.xyz, samplePos.xyz) / totalMovementDistance;
+		float attenuation = 1.0 - (blur * distance(targetPosition.xyz, samplePos.xyz)) / totalMovementDistance;
 
 		color.rgb += tex2Dproj(backgroundTexture, computeStereoUV(samplePos)).rgb*attenuation;
 		accumulatedAttenuation += attenuation;
@@ -1292,9 +1294,9 @@ float3 sampleSobel(sampler2D textureHandle, float3 camRight, float3 camUp, float
 	float3 Gx = float3(0, 0, 0);
 	float3 Gy = float3(0, 0, 0);
 
-	[unroll(3)]
+	UNITY_LOOP
 	for (int x = 0; x < 3; x++)
-		[unroll(3)]
+		UNITY_LOOP
 		for (int y = 0; y < 3; y++)
 		{
 			// Skip center sample since the weight is 0 for both kernels
