@@ -477,8 +477,14 @@ Shader "xwidghet/StereoCancer v0.1"
 
 			// Leave only grab pass texture parameters in the main shader file,
 			// that way layer creation only needs to parse one file.
-			sampler2D _stereoCancerTexture;
+			
+			// SPS-I Support
+			UNITY_DECLARE_SCREENSPACE_TEXTURE(_stereoCancerTexture);
 			float4 _stereoCancerTexture_TexelSize;
+
+			// SPS-I Support
+			// For layer support we need to be able to update the texture variable name. This allows me to do this without having to parse the whole functions file too.
+#define SCREEN_SPACE_TEXTURE_NAME _stereoCancerTexture
 
 			// Stereo Cancer function implementations
 			#include "StereoCancerFunctions.cginc"
@@ -489,6 +495,9 @@ Shader "xwidghet/StereoCancer v0.1"
 
 				// For getting particle position and scale
 				float4 uv : TEXCOORD0;
+
+				// SPS-I Support
+				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
 
 			struct v2f
@@ -504,11 +513,19 @@ Shader "xwidghet/StereoCancer v0.1"
 				nointerpolation float3 objPos : TEXCOORD7;
 				nointerpolation float3 screenSpaceObjPos : TEXCOORD8;
 				nointerpolation float2 colorDistortionFalloff : TEXCOORD9;
+
+				// SPS-I Support
+				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
 			v2f vert (appdata v)
 			{
 				v2f o;
+
+				// SPS-I Support
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_INITIALIZE_OUTPUT(v2f, o);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
 				// Note: This does not utilize cross products to avoid the issue where
 				//		 at certain rotations the Up and Right vectors will flip.
@@ -662,6 +679,9 @@ Shader "xwidghet/StereoCancer v0.1"
 
 			fixed4 frag(v2f i, out float depth : SV_DEPTH) : SV_Target
 			{
+				// SPS-I Support
+				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+
 				// VRChat displays nameplates beyond queue 4000 with depth testing enabled,
 				// so we can remove them by writting the nearest depth.
 				depth = _DisableNameplates ? 1 : i.pos.z;
@@ -697,7 +717,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				// Projected coordinate space
 				UNITY_BRANCH
 				if (_CoordinateSpace == 1)
-					i.viewPos = projectCoordinates(_CameraDepthTexture, i.viewPos, i.camPos, worldVector);
+					i.viewPos = projectCoordinates(i.viewPos, i.camPos, worldVector);
 
 				// Allow for easily changing effect intensities without having to modify
 				// an entire animation. Also very useful for adjusting projected coordinates.
@@ -1049,7 +1069,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_ColorVectorDisplacementStrength != 0)
 				{
-					float3 colorDisplacement = colorVectorDisplacement(_stereoCancerTexture, stereoPosition, _ColorVectorDisplacementStrength);
+					float3 colorDisplacement = colorVectorDisplacement(stereoPosition, _ColorVectorDisplacementStrength);
 
 					// View Space
 					UNITY_BRANCH
@@ -1077,7 +1097,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_NormalVectorDisplacementStrength != 0)
 				{
-					float3 normalDisplacement = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
+					float3 normalDisplacement = normalVectorDisplacement(stereoPosition,
 						worldCoordinates, i.camPos, i.camRight, i.camUp, _NormalVectorDisplacementCoordinateSpace, _NormalVectorDisplacementQuality);
 
 					normalDisplacement *= _NormalVectorDisplacementStrength;
@@ -1281,25 +1301,25 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_colorSkewROverride == 0 || _colorSkewGOverride == 0 || _colorSkewBOverride == 0)
 				{
-					bgcolor = tex2Dproj(_stereoCancerTexture, stereoPosition);
+					bgcolor = UNITY_SAMPLE_SCREENSPACE_TEXTURE(SCREEN_SPACE_TEXTURE_NAME, stereoPosition.xy / stereoPosition.w);
 
 					UNITY_BRANCH
 					if (_ChromaticAberrationBlend != 0 && _ChromaticAberrationStrength != 0)
 					{
-						half3 chromaticColor = chromaticAberration(_stereoCancerTexture, worldCoordinates, i.camFront, _ChromaticAberrationStrength, _ChromaticAberrationSeparation, _ChromaticAberrationShape);
+						half3 chromaticColor = chromaticAberration( worldCoordinates, i.camFront, _ChromaticAberrationStrength, _ChromaticAberrationSeparation, _ChromaticAberrationShape);
 						bgcolor.rgb = lerp(bgcolor.rgb, chromaticColor, _ChromaticAberrationBlend);
 					}
 					UNITY_BRANCH
 					if (_BlurMovementBlend != 0 && _BlurMovementOpacity != 0)
 					{
-						half3 blurColor = blurMovement(_stereoCancerTexture, startingWorldPos, worldCoordinates, _BlurMovementSampleCount,
+						half3 blurColor = blurMovement(startingWorldPos, worldCoordinates, _BlurMovementSampleCount,
 							_BlurMovementTarget, _BlurMovementRange, _BlurMovementExtrapolation, _BlurMovementBlurIntensity, _BlurMovementOpacity);
 						bgcolor.rgb = lerp(bgcolor.rgb, blurColor, _BlurMovementBlend);
 					}
 					UNITY_BRANCH
 					if (_DistortionDesyncBlend != 0 && any(float3(_DistortionDesyncR, _DistortionDesyncG, _DistortionDesyncB)))
 					{
-						half3 rgbColor = rgbColorDesync(_stereoCancerTexture, startingWorldPos, worldCoordinates, _DistortionDesyncR, _DistortionDesyncG, _DistortionDesyncB);
+						half3 rgbColor = rgbColorDesync(startingWorldPos, worldCoordinates, _DistortionDesyncR, _DistortionDesyncG, _DistortionDesyncB);
 						bgcolor.rgb = lerp(bgcolor.rgb, rgbColor, _DistortionDesyncBlend);
 					}
 
@@ -1313,7 +1333,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_PaletteOpacity != 0)
 				{
-					float3 palleteWorldPos = worldPosFromDepth(_CameraDepthTexture, computeStereoUV(worldCoordinates), i.camPos, worldCoordinates);
+					float3 palleteWorldPos = worldPosFromDepth(computeStereoUV(worldCoordinates), i.camPos, worldCoordinates);
 					half3 paletteColor = palletization(palleteWorldPos, bgcolor, _PalleteSource, _PaletteScale, _PaletteOffset, _PaletteA, _PaletteB, _PaletteOscillation, _PalettePhase);
 					
 					bgcolor.rgb = lerp(bgcolor.rgb, paletteColor, _PaletteOpacity);
@@ -1337,16 +1357,16 @@ Shader "xwidghet/StereoCancer v0.1"
 				{
 					half3 triplanarColor = half3(0, 0, 0);
 
-					float3 normal = normalVectorDisplacement(_CameraDepthTexture, _CameraDepthTexture_TexelSize, stereoPosition,
+					float3 normal = normalVectorDisplacement(stereoPosition,
 						worldCoordinates, i.camPos, i.camRight, i.camUp, _TriplanarCoordinateSrc == 2 ? 0 : 1, _TriplanarQuality);
 
 					// Sample map
 					if (_TriplanarSampleSrc == 0)
-						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
+						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
 							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 1, false);
 					// Sample screen, UV range is reduced to the range (0.2, 0.8) to hide the VR mask.
 					else
-						triplanarColor = stereoTriplanarMappping(_stereoCancerTexture, _TriplanarMap_ST, _CameraDepthTexture, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
+						triplanarColor = stereoTriplanarMappping(_TriplanarMap, _TriplanarMap_ST, stereoPosition, i.camPos, normal, worldCoordinates, i.viewPos,
 							_TriplanarOffsetX, _TriplanarOffsetY, _TriplanarOffsetZ, _TriplanarCoordinateSrc, _TriplanarScale, _TriplanarSharpness, 0.6, true);
 
 					triplanarColor *= _TriplanarOpacity;
@@ -1374,11 +1394,11 @@ Shader "xwidghet/StereoCancer v0.1"
 					// Fog requires projected coordinates, so if the user isn't using them
 					// then we need to project the coordinates ourself.
 					if (_CoordinateSpace == 0)
-						fogWorldPosition = projectCoordinates(_CameraDepthTexture, fogWorldPosition, i.camPos, normalize(fogWorldPosition));
+						fogWorldPosition = projectCoordinates(fogWorldPosition, i.camPos, normalize(fogWorldPosition));
 					// Center On Object, doesn't support mirrors. Will be black.
 					else if(_CoordinateSpace == 2)
 					{
-						fogWorldPosition.xyz = worldPosFromDepth(_CameraDepthTexture, stereoPosition, i.camPos, worldCoordinates);
+						fogWorldPosition.xyz = worldPosFromDepth(stereoPosition, i.camPos, worldCoordinates);
 						fogWorldPosition.xyz -= i.objPos;
 					}
 
@@ -1473,7 +1493,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_SobelOpacity != 0)
 				{
-					float sobelMagnitude = sobelFilter(_stereoCancerTexture, i.camRight, i.camUp, worldCoordinates, _SobelSearchDistance, _SobelQuality)*_SobelOpacity;
+					float sobelMagnitude = sobelFilter(i.camRight, i.camUp, worldCoordinates, _SobelSearchDistance, _SobelQuality)*_SobelOpacity;
 
 					// None, aka Overwrite
 					if (_SobelBlendMode == 0)
@@ -1491,7 +1511,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_colorSkewROpacity != 0 || _colorSkewROverride != 0)
 				{
-					float redColor = colorShift(_stereoCancerTexture, _colorSkewRAngle, _colorSkewRDistance,
+					float redColor = colorShift(_colorSkewRAngle, _colorSkewRDistance,
 						_colorSkewROpacity, stereoPosition).r;
 
 					if (_colorSkewROverride != 0)
@@ -1502,7 +1522,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_colorSkewGOpacity != 0 || _colorSkewGOverride != 0)
 				{
-					float greenColor = colorShift(_stereoCancerTexture, _colorSkewGAngle, _colorSkewGDistance,
+					float greenColor = colorShift(_colorSkewGAngle, _colorSkewGDistance,
 						_colorSkewGOpacity, stereoPosition).g;
 
 					if (_colorSkewGOverride != 0)
@@ -1513,7 +1533,7 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if (_colorSkewBOpacity != 0 || _colorSkewBOverride != 0)
 				{
-					float blueColor = colorShift(_stereoCancerTexture, _colorSkewBAngle, _colorSkewBDistance,
+					float blueColor = colorShift(_colorSkewBAngle, _colorSkewBDistance,
 						_colorSkewBOpacity, stereoPosition).b;
 
 					if (_colorSkewBOverride != 0)

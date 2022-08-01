@@ -1,4 +1,4 @@
-#ifndef STEREO_CANCER_PARAMTERS
+#ifndef STEREO_CANCER_PARAMETERS
 #define STEREO_CANCER_PARAMETERS
 
 int _ParticleSystem;
@@ -52,7 +52,8 @@ int _MaskFlags;
 int _MaskMapScaleWithDistance;
 int _MaskSampleDistortedCoordinates;
 
-sampler2D _CameraDepthTexture;
+// SPS-I Support
+UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
 float4 _CameraDepthTexture_TexelSize;
 
 float _CancerOpacity;

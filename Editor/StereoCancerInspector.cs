@@ -579,16 +579,31 @@ public class StereoCancerGUI : ShaderGUI
                                 string[] shaderFileText = File.ReadAllLines(shaderPath);
                                 StringBuilder shaderStringBuilder = new StringBuilder("// UNITY_SHADER_NO_UPGRADE\n\n" + customShaderName);
 
+                                bool foundAllLinesToReplace = false;
+
                                 // Skip past old name line
                                 for (int i = 3; i < shaderFileText.Length; i++)
                                 {
-                                    if(shaderFileText[i].Contains("\"Overlay\""))
+                                    // Skip running expensive string functions where we know there's nothing to replace
+                                    if (i < 412 || foundAllLinesToReplace)
                                     {
-                                        shaderStringBuilder.AppendLine(shaderFileText[i].Replace("\"Overlay\"", renderQueueString));
+                                        shaderStringBuilder.AppendLine(shaderFileText[i]);
                                     }
                                     else
                                     {
-                                        shaderStringBuilder.AppendLine(shaderFileText[i].Replace("_stereoCancerTexture", internalGrabPassName));
+                                        if (shaderFileText[i].Contains("\"Overlay\""))
+                                        {
+                                            shaderStringBuilder.AppendLine(shaderFileText[i].Replace("\"Overlay\"", renderQueueString));
+                                        }
+                                        else if (shaderFileText[i].Contains("appdata"))
+                                        {
+                                            foundAllLinesToReplace = true;
+                                            shaderStringBuilder.AppendLine(shaderFileText[i]);
+                                        }
+                                        else
+                                        {
+                                            shaderStringBuilder.AppendLine(shaderFileText[i].Replace("_stereoCancerTexture", internalGrabPassName));
+                                        }
                                     }
                                 }
 
