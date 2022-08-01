@@ -220,18 +220,6 @@ float4 stereoRotate(float4 worldCoordinates, float3 axis, float angle)
 	return worldCoordinates;
 }
 
-float4 stereoMove(float4 worldPos, float3 camFront, float3 camRight, float angle, float distance)
-{
-	float3 movedPos = mul(rotAxis(camFront, angle), camRight);
-
-	// Adjust for world scale coordinates being backwards when moving stereo coordinates.
-	movedPos.xy *= -1;
-
-	worldPos.xyz += movedPos * distance;
-
-	return worldPos;
-}
-
 float4 stereoShake(float4 worldPos, float shakeSpeed, float shakeXIntensity, float shakeXAmplitude, float shakeYIntensity, float shakeYAmplitude,
 	float shakeZIntensity, float shakeZAmplitude)
 {
@@ -1134,26 +1122,27 @@ half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, fl
 	// order which keeps the texture oriented right-side up on vertical walls.
 
 	half3 colorX, colorY, colorZ;
+	samplePosition.xyz = frac(samplePosition.xyz);
 
 	if (sampleScreen)
 	{
 #if defined(UNITY_STEREO_INSTANCING_ENABLED) || defined(UNITY_STEREO_MULTIVIEW_ENABLED)
 		// SPS-I uses a Texture2D array to store the eye textures, so we need to steal the left eye texture from the array instead of simply sampling the left half of the screen texture
-		colorX = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(frac(samplePosition.zy) * uvRangeMultiplier + uvOffset, 0.0));
-		colorY = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(frac(samplePosition.xz) * uvRangeMultiplier + uvOffset, 0.0));
-		colorZ = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(frac(samplePosition.xy) * uvRangeMultiplier + uvOffset, 0.0));
+		colorX = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(samplePosition.zy * uvRangeMultiplier + uvOffset, 0.0));
+		colorY = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(samplePosition.xz * uvRangeMultiplier + uvOffset, 0.0));
+		colorZ = UNITY_SAMPLE_TEX2DARRAY(SCREEN_SPACE_TEXTURE_NAME, float3(samplePosition.xy * uvRangeMultiplier + uvOffset, 0.0));
 #else
-		colorX = tex2D(SCREEN_SPACE_TEXTURE_NAME, frac(samplePosition.zy) * uvRangeMultiplier + uvOffset);
-		colorY = tex2D(SCREEN_SPACE_TEXTURE_NAME, frac(samplePosition.xz) * uvRangeMultiplier + uvOffset);
-		colorZ = tex2D(SCREEN_SPACE_TEXTURE_NAME, frac(samplePosition.xy) * uvRangeMultiplier + uvOffset);
+		colorX = tex2D(SCREEN_SPACE_TEXTURE_NAME, samplePosition.zy * uvRangeMultiplier + uvOffset);
+		colorY = tex2D(SCREEN_SPACE_TEXTURE_NAME, samplePosition.xz * uvRangeMultiplier + uvOffset);
+		colorZ = tex2D(SCREEN_SPACE_TEXTURE_NAME, samplePosition.xy * uvRangeMultiplier + uvOffset);
 #endif
 	}
 	else
 	{
 		// ddx and ddy are used to resolve mipmap sampling artifacts when the texture wraps around.
-		colorX = tex2D(triplanarMap, frac(samplePosition.zy) * uvRangeMultiplier + uvOffset, ddx(samplePosition.z), ddy(samplePosition.y));
-		colorY = tex2D(triplanarMap, frac(samplePosition.xz) * uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.z));
-		colorZ = tex2D(triplanarMap, frac(samplePosition.xy) * uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.y));
+		colorX = tex2D(triplanarMap, samplePosition.zy * uvRangeMultiplier + uvOffset, ddx(samplePosition.z), ddy(samplePosition.y));
+		colorY = tex2D(triplanarMap, samplePosition.xz * uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.z));
+		colorZ = tex2D(triplanarMap, samplePosition.xy * uvRangeMultiplier + uvOffset, ddx(samplePosition.x), ddy(samplePosition.y));
 	}
 
 	return colorX * blendWeights.x + colorY * blendWeights.y + colorZ * blendWeights.z;
@@ -1162,7 +1151,7 @@ half3 stereoTriplanarMappping(sampler2D triplanarMap, float4 triplanarMap_ST, fl
 
 half3 colorShift(float skewAngle, float skewDistance, float opacity, float4 grabPos)
 {
-	grabPos = stereoMove(grabPos, float3(0,0,1), float3(1,0,0), skewAngle, skewDistance);
+	grabPos.xy += rotate2D(float2(-1, 0), -skewAngle) * skewDistance;
 
 	half3 color = UNITY_SAMPLE_SCREENSPACE_TEXTURE(SCREEN_SPACE_TEXTURE_NAME, grabPos.xy / grabPos.w).xyz;
 	color *= opacity;
@@ -1352,16 +1341,35 @@ float sobelFilter(float3 camRight, float3 camUp, float4 worldCoordinates, float 
 		float4x3 sobelMagMat;
 		float subSampleOffset = searchDistance / 2;
 
-		float4 samplePosBL = worldCoordinates + float4((-camRight - camUp) * subSampleOffset, 0);
-		float4 samplePosBR = worldCoordinates + float4((camRight - camUp) * subSampleOffset, 0);
+		float4x4 samplePositions = {
+			float4(worldCoordinates + float4((-camRight - camUp) * subSampleOffset, 0)),
+			float4(worldCoordinates + float4((camRight - camUp) * subSampleOffset, 0)),
+			float4(worldCoordinates + float4((camRight + camUp) * subSampleOffset, 0)),
+			float4(worldCoordinates + float4((-camRight + camUp) * subSampleOffset, 0))
+		};
 
-		float4 samplePosTL = worldCoordinates + float4((camRight + camUp) * subSampleOffset, 0);
-		float4 samplePosTR = worldCoordinates + float4((-camRight + camUp) * subSampleOffset, 0);
+		UNITY_LOOP
+		for (int i = 0; i < 4; i++)
+		{
+			float3 result = sampleSobel(camRight, camUp, samplePositions[i], subSampleOffset);
 
-		sobelMagMat[0] = sampleSobel(camRight, camUp, samplePosBL, subSampleOffset);
-		sobelMagMat[1] = sampleSobel(camRight, camUp, samplePosBR, subSampleOffset);
-		sobelMagMat[2] = sampleSobel(camRight, camUp, samplePosTL, subSampleOffset);
-		sobelMagMat[3] = sampleSobel(camRight, camUp, samplePosTR, subSampleOffset);
+			// Hack to force the shader compiler to let me loop this constant-length loop.
+			switch (i)
+			{
+			case 0:
+				sobelMagMat[0] = result;
+				break;
+			case 1:
+				sobelMagMat[1] = result;
+				break;
+			case 2:
+				sobelMagMat[2] = result;
+				break;
+			case 3:
+				sobelMagMat[3] = result;
+				break;
+			}
+		}
 
 		sobelMag = (sobelMag + (sobelMagMat[0] + sobelMagMat[1] + sobelMagMat[2] + sobelMagMat[3]) / 4) / 2;
 	}
