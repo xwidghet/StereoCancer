@@ -1,6 +1,10 @@
 #ifndef CANCER_HELPERS_CGINC
 #define CANCER_HELPERS_CGINC
 
+// Hail bgolus
+// https://forum.unity.com/threads/translating-a-glsl-shader-noise-algorithm-to-hlsl-cg.485750/
+#define glsl_mod(x, y) (x - y * floor(x / y))
+
 // iq is the man!
 // https://iquilezles.org/www/articles/palettes/palettes.htm
 // cosine based palette, 4 vec3 params

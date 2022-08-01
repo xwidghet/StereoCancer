@@ -212,7 +212,7 @@ float4 projectCoordinates(sampler2D depthTexture, float4 worldCoordinates, float
 
 float4 stereoRotate(float4 worldCoordinates, float3 axis, float angle)
 {
-	worldCoordinates.xyz = mul(rotAxis(axis, fmod(angle, UNITY_TWO_PI)), worldCoordinates);
+	worldCoordinates.xyz = mul(rotAxis(axis, glsl_mod(angle, UNITY_TWO_PI)), worldCoordinates);
 
 	return worldCoordinates;
 }
@@ -335,7 +335,7 @@ float3 stereoSkew(float2 worldCoordinates, float3 moveAxis, float flipPoint, flo
 	float intPosY = floor(abs(flipPoint));
 	float skewDir = -1 + 2 * step(1, (intPosY % 2));
 
-	float skewVal = fmod(abs(flipPoint + offset), interval) / interval - 0.5;
+	float skewVal = glsl_mod(abs(flipPoint + offset), interval) / interval - 0.5;
 	skewVal *= skewDir;
 
 	skewVal *= distance;
@@ -370,7 +370,7 @@ float4 geometricDither(float4 worldCoordinates, float3 camRight, float3 camUp, f
 	// quality enough to be worth the performance hit
 	UNITY_BRANCH
 	if (randomization != 0)
-		offset = gold_noise(fmod(_Time.z, 1), fmod(_Time.y, 1))*randomization;
+		offset = gold_noise(glsl_mod(_Time.z, 1), glsl_mod(_Time.y, 1))*randomization;
 
 	// There's probably a way more efficient way to do this,
 	// but it's good enough for now and allows for
@@ -546,7 +546,7 @@ float4 stereoZigZag(float4 worldCoordinates, float3 moveAxis, float flipPoint, f
 	float intPos = floor(abs(effectVal) * 10);
 	float skewDir = -1 + 2 * step(1, (intPos % 2));
 
-	float skewVal = fmod(abs(effectVal), 0.1) / 0.1 - 0.5;
+	float skewVal = glsl_mod(abs(effectVal), 0.1) / 0.1 - 0.5;
 	skewVal *= skewDir * amplitude;
 
 	worldCoordinates.xyz += moveAxis * skewVal;
@@ -560,7 +560,7 @@ float2 stereoBlockDisplacement(float2 worldCoordinates, float blockSize, float i
 	//		 over the issue with an imperceptible jump.
 	seed = seed == 0 ? 0.001 : seed;
 
-	float seedCheck = fmod(seed, 10);
+	float seedCheck = glsl_mod(seed, 10);
 	UNITY_BRANCH
 	if (seedCheck <= 0.001)
 		seed += sign(seed)*0.0001;
