@@ -92,12 +92,16 @@ Shader "xwidghet/StereoCancer v0.1"
 		_MemeImageCount("Meme Image Count", Int) = 1
 		_MemeImageIndex("Meme Image Index", Int) = 0
 		_MemeImageAngle("Meme Image Angle", Float) = 0
+		[Enum(Screen,0, Object,1, Screen And Object Direction,2)] _MemeImageAlignment("Meme Image Alignment", Int) = 0
+		_MemeImageDistance("Meme Image Distance", Float) = 50
+		_MemeImageYaw("Meme Image Yaw", Float) = 0
+		_MemeImagePitch("Meme Image Pitch", Float) = 0
 		_MemeTexOpacity("Meme Opacity", Float) = 0
 		[Enum(No,0, Yes,1)] _MemeTexClamp("Meme Clamp", Int) = 0
 		[Enum(No,0, Yes,1)] _MemeTexCutOut("Meme Cut Out", Int) = 0
 		_MemeTexAlphaCutOff("Meme Alpha CutOff", Float) = 0.9
 		[Enum(None,0, Background,1, Empty Space,2)] _MemeTexOverrideMode("Meme Screen Override Mode", Float) = 0
-		[Enum(No,0, Yes,1)] _MemeImageScaleWithDistance("Meme Image Scale With Distance", Int) = 0
+		[Enum(No,0, Yes (Requires Directional Light),1)] _MemeImageZTest("Meme ZTest", Int) = 0
 
 		// Mask Map
 		_MaskMap("Mask Map (R)", 2D) = "white" {}
@@ -418,7 +422,7 @@ Shader "xwidghet/StereoCancer v0.1"
 		// Blend against the current screen texture to allow for
 		// fading in/out the cancer effects and various other shenanigans.
 		Blend[_SrcFactor][_DstFactor]
-		
+
 		// Grab Pass textures are shared by name, so this must be a unique name.
 		// Otherwise we'll get the screen texture from the time the first object rendered
 		//
@@ -510,9 +514,10 @@ Shader "xwidghet/StereoCancer v0.1"
 				nointerpolation float3 camUp : TEXCOORD4;
 				nointerpolation float3 camPos : TEXCOORD5;
 				nointerpolation float3 centerCamPos : TEXCOORD6;
-				nointerpolation float3 objPos : TEXCOORD7;
-				nointerpolation float3 screenSpaceObjPos : TEXCOORD8;
-				nointerpolation float2 colorDistortionFalloff : TEXCOORD9;
+				nointerpolation float3 centerCamViewDir : TEXCOORD7;
+				nointerpolation float3 objPos : TEXCOORD8;
+				nointerpolation float3 screenSpaceObjPos : TEXCOORD9;
+				nointerpolation float2 colorDistortionFalloff : TEXCOORD10;
 
 				// SPS-I Support
 				UNITY_VERTEX_OUTPUT_STEREO
@@ -542,8 +547,23 @@ Shader "xwidghet/StereoCancer v0.1"
 					float3(unity_StereoCameraToWorld[0][0][3], unity_StereoCameraToWorld[0][1][3], unity_StereoCameraToWorld[0][2][3]),
 					float3(unity_StereoCameraToWorld[1][0][3], unity_StereoCameraToWorld[1][1][3], unity_StereoCameraToWorld[1][2][3]),
 					0.5);
+
+				int otherCameraIndex = 1 - unity_StereoEyeIndex;
+				o.centerCamViewDir = lerp(o.camFront, mul((float3x3)unity_StereoCameraToWorld[otherCameraIndex], float3(0, 0, 1)), 0.5);
+				o.centerCamViewDir = normalize(o.centerCamViewDir);
 #else
-				o.centerCamPos = o.camPos;
+				UNITY_BRANCH
+				if (_VRChatMirrorMode > 0)
+				{
+					o.centerCamPos = _VRChatMirrorCameraPos;
+				}
+				else
+				{
+					o.centerCamPos = o.camPos;
+				}
+				
+				// Sorry canted display users, I don't see a way to calculate the proper view direction in the mirror without VRChat adding a center camera view direction.
+				o.centerCamViewDir = o.camFront;
 #endif
 
 				// Extract object position from the model matrix.
@@ -611,13 +631,6 @@ Shader "xwidghet/StereoCancer v0.1"
 				{
 					// For VR we want to use a consistent camera position and direction so that the eyes get the same amount
 					// of opacity and distortion reduction.
-#if defined(USING_STEREO_MATRICES)
-					int otherCameraIndex = 1 - unity_StereoEyeIndex;
-					float3 centerCamDir = lerp(o.camFront, mul((float3x3)unity_StereoCameraToWorld[otherCameraIndex], float3(0, 0, 1)), 0.5);
-					centerCamDir = normalize(centerCamDir);
-#else
-					float3 centerCamDir = o.camFront;
-#endif
 					float distanceFalloffAlpha = 1;
 					
 					// Normal Objects
@@ -645,7 +658,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					if (_FalloffAngleBegin < 1)
 					{
 						float3 toObjectVec = normalize(o.objPos - o.centerCamPos);
-						float angle = clamp(dot(toObjectVec, centerCamDir), -1, 1);
+						float angle = clamp(dot(toObjectVec, o.centerCamViewDir), -1, 1);
 
 						float angleFalloffBegin = 1 - _FalloffAngleBegin;
 						float angleFalloffEnd = 1 - _FalloffAngleEnd;
@@ -685,6 +698,9 @@ Shader "xwidghet/StereoCancer v0.1"
 				// VRChat displays nameplates beyond queue 4000 with depth testing enabled,
 				// so we can remove them by writting the nearest depth.
 				depth = _DisableNameplates ? 1 : i.pos.z;
+
+				// Used for Image Overlay ZTest
+				float4 startingViewPos = i.viewPos;
 
 				if (_DisplayOnSurface)
 				{
@@ -1410,11 +1426,92 @@ Shader "xwidghet/StereoCancer v0.1"
 				UNITY_BRANCH
 				if(_MemeTexOpacity != 0)
 				{
-					float4 samplePosition = i.viewPos;
+					float3 planeNormal = i.centerCamViewDir;
+					float3 planeUpVector = i.camUp;
+					float3 planeOrigin = i.centerCamPos + i.centerCamViewDir * _MemeImageDistance;
+
+					// Object
+					if (_MemeImageAlignment >= 1)
+					{
+						planeNormal = normalize(mul((float3x3)UNITY_MATRIX_M, float3(0, 0, 1)));
+						planeUpVector = normalize(mul((float3x3)UNITY_MATRIX_M, float3(0, 1, 0)));
+						planeOrigin = _MemeImageAlignment == 2 ? i.centerCamPos : i.objPos;
+						planeOrigin += planeNormal * _MemeImageDistance;
+					}
+					if (_MemeImageYaw != 0.0)
+					{
+						planeNormal = mul(rotAxis(planeUpVector, _MemeImageYaw), planeNormal);
+					}
+					if (_MemeImagePitch != 0.0)
+					{
+						planeNormal = mul(rotAxis(normalize(cross(planeUpVector, planeNormal)), _MemeImagePitch), planeNormal);
+					}
+
+					// Projected
+					if (_CoordinateSpace == 1)
+					{
+						planeOrigin -= i.viewPos.z * i.centerCamViewDir;
+					}
+					// Centered On Object
+					else if (_CoordinateSpace == 2)
+					{
+						planeOrigin += (i.objPos - i.centerCamPos);
+					}
+
+					float3 pixelDir = worldCoordinates.xyz;
+					// Screen
+					if (_MemeImageAlignment == 0 && _RemoveCameraRoll == 1)
+					{
+						pixelDir -= i.centerCamPos;
+						pixelDir = mul(rotAxis(i.centerCamViewDir, cameraRollAngle), pixelDir);
+						pixelDir += i.centerCamPos;
+					}
+					pixelDir = normalize(pixelDir - i.camPos);
+					
+					const float planeIntersectionDistance = intersectPlane(planeOrigin, planeNormal, i.camPos, pixelDir);
+					const float3 planeIntersectionPoint = (i.camPos + pixelDir * planeIntersectionDistance);
+					const float3 positionOnPlane = planeIntersectionPoint - planeOrigin;
+
+					float4 samplePosition = float4(0, 0, 0, 0);
+
+					// https://math.stackexchange.com/questions/3528493/convert-3d-point-onto-a-2d-coordinate-plane-of-any-angle-and-location-within-the
+					const float3 planeUAxis = normalize(cross(-planeUpVector, planeNormal));
+					const float3 planeVAxis = normalize(cross(planeUAxis, planeNormal));
+
+					// Need to determine the UV axis we can use which doesn't align with the world axis to avoid dividing by zero.
+					const float denominators[3] = { (planeUAxis.x * planeVAxis.y) - (planeVAxis.x * planeUAxis.y),
+										(planeUAxis.x * planeVAxis.z) - (planeVAxis.x * planeUAxis.z),
+										(planeUAxis.y * planeVAxis.z) - (planeVAxis.y * planeUAxis.z) };
+
+					int UIndex = 0;
+					if (abs(denominators[UIndex]) < 0.01)
+						UIndex++;
+					if (abs(denominators[UIndex]) < 0.01)
+						UIndex++;
+
+					switch (UIndex)
+					{
+					case 0:
+						samplePosition.x = positionOnPlane.x * planeVAxis.y - positionOnPlane.y * planeVAxis.x;
+						samplePosition.y = positionOnPlane.y * planeUAxis.x - positionOnPlane.x * planeUAxis.y;
+						break;
+					case 1:
+						samplePosition.x = positionOnPlane.x * planeVAxis.z - positionOnPlane.z * planeVAxis.x;
+						samplePosition.y = positionOnPlane.z * planeUAxis.x - positionOnPlane.x * planeUAxis.z;
+						break;
+					case 2:
+						samplePosition.x = positionOnPlane.y * planeVAxis.z - positionOnPlane.z * planeVAxis.y;
+						samplePosition.y = positionOnPlane.z * planeUAxis.y - positionOnPlane.y * planeUAxis.z;
+						break;
+					}
+
+					samplePosition.xy /= denominators[UIndex];
+
+					// Flip every other rotation so the image stays facing the same vertical direction. Horizontal flip is handled by the plane itself.
+					samplePosition.y *= -1 + 2 * (abs(fmod(-abs(_MemeImagePitch) - UNITY_HALF_PI, UNITY_TWO_PI)) < UNITY_PI);
+
 					if (_MemeImageAngle != 0)
 						samplePosition.xy = rotate2D(samplePosition.xy, _MemeImageAngle);
-
-					samplePosition.xy *= 1 + _MemeImageScaleWithDistance*distance(i.centerCamPos, i.objPos);
 
 					bool dropMemePixels = false;
 					half4 memeColor = stereoImageOverlay(samplePosition, startingAxisAlignedPos,
@@ -1423,6 +1520,25 @@ Shader "xwidghet/StereoCancer v0.1"
 						_MemeTexClamp, _MemeTexCutOut,
 						dropMemePixels);
 
+					// Hide the plane on the other side of the camera, while allowing for displaying the backface of the plane.
+					dropMemePixels = dropMemePixels || planeIntersectionDistance < 0;
+
+					if (_MemeImageZTest == 1)
+					{
+						float4 cullWorldPos = worldCoordinates;
+
+						// Since the distortion isn't applied to the screen in this case, use the original pixel for culling.
+						// This allows for making the distorted image appear like it is a normal mesh in the world.
+						// Override Background
+						if (_MemeTexOverrideMode == 1)
+						{
+							cullWorldPos = mul(UNITY_MATRIX_I_V, startingViewPos);
+						}
+
+						const float3 projectedWorldCoordinates = worldPosFromDepth(computeStereoUV(cullWorldPos), i.camPos, cullWorldPos);
+						dropMemePixels = dropMemePixels || (length(projectedWorldCoordinates - i.camPos) < planeIntersectionDistance);
+					}
+
 					if (dropMemePixels == false)
 					{
 						if (memeColor.a > _MemeTexAlphaCutOff)
@@ -1430,19 +1546,19 @@ Shader "xwidghet/StereoCancer v0.1"
 							// No override mode, blend image in.
 							if (_MemeTexOverrideMode == 0)
 							{
-								bgcolor.rgb = lerp(bgcolor.rgb, memeColor.rgb, (_MemeTexOpacity*memeColor.a));
+								bgcolor.rgb = lerp(bgcolor.rgb, memeColor.rgb, (_MemeTexOpacity * memeColor.a));
 							}
 							// Override Background
 							else if (_MemeTexOverrideMode == 1)
 							{
-								bgcolor = float4(memeColor.rgb * (_MemeTexOpacity*memeColor.a), 1);
+								bgcolor = float4(memeColor.rgb * (_MemeTexOpacity * memeColor.a), 1);
 							}
 							// Override Empty Space
 							else if (_MemeTexOverrideMode == 2)
 							{
 								if (clearPixel)
 								{
-									bgcolor = float4(memeColor.rgb * (_MemeTexOpacity*memeColor.a), 1);
+									bgcolor = float4(memeColor.rgb * (_MemeTexOpacity * memeColor.a), 1);
 									return bgcolor;
 								}
 							}

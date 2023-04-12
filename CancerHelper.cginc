@@ -316,9 +316,9 @@ float gold_noise(float2 coordinate, float seed)
 {
 	const float PHI = 1.61803398874989484820459; // Golden Ratio
 	const float SRT = 1.41421356237309504880169;
-	
+
 	float2 temp = coordinate*float2((seed + PHI), (seed + PHI));
-	float2 temp2 = float2(PHI, UNITY_PI);
+	const float2 temp2 = float2(PHI, UNITY_PI);
     return frac(sin(dot(temp, temp2))*SRT);
 }
 
@@ -355,6 +355,19 @@ float tpdf(float x)
 }
 
 // Begin xwidghet helpers
+float intersectPlane(float3 planeOrigin, float3 planeNormal, float3 rayOrigin, float3 rayDir)
+{
+    const float denom = dot(planeNormal, rayDir);
+    // Normally you would check if this is smaller than some value, but since I want backfaces I only avoid division by zero.
+    if (denom != 0.0)
+    {
+        const float3 toPlane = planeOrigin - rayOrigin;
+        return dot(toPlane, planeNormal) / denom;
+    }
+
+    return 0.0;
+}
+
 float angleToWorldCoordinate(float4 worldCoordinates, float3 camFront)
 {
 	float3 worldVector = normalize(worldCoordinates - _WorldSpaceCameraPos);

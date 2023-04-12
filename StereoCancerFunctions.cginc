@@ -41,9 +41,9 @@
 // Returns true when the vertex or fragment should not be visible
 bool mirrorCheck(float cancerDisplayMode)
 {
-	// Original source for this check seems to be from Merlin, according the the following shader:
-	//https://github.com/netri/Neitri-Unity-Shaders/blob/master/World%20Triplanar%20Mapped.shader
-	bool isMirror = unity_CameraProjection[2][0] != 0 || unity_CameraProjection[2][1] != 0;
+	// https://docs.vrchat.com/docs/vrchat-202231
+	// 1 is Mirror VR and 2 is Mirror Desktop.
+	bool isMirror = _VRChatMirrorMode > 0;
 
 	// cancerDisplayMode == 0: Display on screen only
 	// cancerDisplayMode == 1: Display on mirror only
@@ -1163,47 +1163,30 @@ half3 signalNoise(float4 worldPos, float scale, float colorization, float opacit
 {
 	// Only seed noise with time to allow for
 	// custom noise size via world coordinates
-	//
-	// Rotate randomly really fast to hide moire artifacts
-	// when small noise size (less than 5) is used
-	//
-	// Values chosen have no mathmatical significance, they're just arbitrary values
-	// to attempt to make it difficult to percieve any pattern in the movement
-	float3 randomAxis1 = normalize(float3(2 + gold_noise(_Time.z, _Time.y - 1),
-		-4 + 3 * gold_noise(_Time.x, _Time.x),
-		6 - 5 * gold_noise(_Time.w, _Time.z)));
+	float time = frac(_Time.x);
+	float3 randomOffset = float3(gold_noise(time, time + 1),
+		 gold_noise(time + 2, time + 3),
+		gold_noise(time + 4, time + 5)) - 0.5;
 
-	// TODO: Verify if high scene times (read: sitting in worlds for 5+ hours)
-	//		 results in 'low fps' noise due to floating point inaccuracy
-	//
-	//		 Though lets be real here...even if this is an issue
-	//		 it'll likely be hidden by VRChat running at cinematic
-	//		 framerates.
-	float3 noisePos = worldPos.xyz;
-	noisePos.z += gold_noise(_Time.z, _Time.y) * 10000;
-	noisePos = mul(rotAxis(randomAxis1, _Time.y * 1000), noisePos);
+	float3 noisePos = worldPos.xyz + randomOffset * (10000 * scale);
+	noisePos = mul(rotAxis(float3(0.70710678, 0.70710678, 0), UNITY_PI/4), noisePos);
 
-	UNITY_BRANCH
-	if (colorization != 0)
+	noisePos /= scale;
+
+	int channelCount = colorization != 0 ? 3 : 1;
+	float noiseArray[3];
+
+	UNITY_LOOP
+	for (int i = 0; i < channelCount; i++)
 	{
-		half4 noisecolor = half4(
-			snoise(noisePos.xyz / scale),
-			snoise(noisePos.yzx / scale),
-			snoise(noisePos.zxy / scale),
-			0);
-		noisecolor *= opacity;
-
-		// Scale the HSV value with _ColorizedSignalNoise to allow the user
-		// to decide how much color they want in the noise.
-		half3 hsvColor = rgb2hsv(noisecolor.xyz);
-		hsvColor.y = clamp(colorization, 0, 1);
-
-		return hsv2rgb(hsvColor);
+		noiseArray[i] = snoise(noisePos.xyz);
+		noisePos.xyz = noisePos.yzx;
 	}
-	else
-	{
-		return snoise(noisePos / scale) * opacity;
-	}
+
+	half3 noiseColor = half3(noiseArray);
+	noiseColor *= opacity;
+
+	return lerp(noiseColor.xxx, noiseColor.xyz, colorization);
 }
 
 half3 circularVignette(half4 bgcolor, float4 worldPos, float4 color, float opacity, float roundness, float fallOffMode, float begin, float end)

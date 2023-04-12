@@ -127,13 +127,17 @@ public class StereoCancerGUI : ShaderGUI
     MaterialProperty _MemeImageRows = null;
     MaterialProperty _MemeImageCount = null;
     MaterialProperty _MemeImageIndex = null;
+    MaterialProperty _MemeImageDistance = null;
+    MaterialProperty _MemeImageAlignment = null;
+    MaterialProperty _MemeImageYaw = null;
+    MaterialProperty _MemeImagePitch = null;
     MaterialProperty _MemeImageAngle = null;
     MaterialProperty _MemeTexOpacity = null;
     MaterialProperty _MemeTexClamp = null;
     MaterialProperty _MemeTexCutOut = null;
     MaterialProperty _MemeTexAlphaCutOff = null;
     MaterialProperty _MemeTexOverrideMode = null;
-    MaterialProperty _MemeImageScaleWithDistance = null;
+    MaterialProperty _MemeImageZTest = null;
 
     MaterialProperty _stereoCancerTexture = null;
     MaterialProperty _stereoCancerTexture_TexelSize = null;
@@ -742,15 +746,16 @@ public class StereoCancerGUI : ShaderGUI
             materialEditor.ShaderProperty(_MemeImageCount, new GUIContent("Image Count", "The total number of images packed into the overlay texture. Allows for the index to loop seemlessly when not all of the image spaces have been filled."));
             materialEditor.ShaderProperty(_MemeImageIndex, new GUIContent("Image Index", "The current index of the image in the potentially packed overlay texture."));
             materialEditor.ShaderProperty(_MemeImageAngle, new GUIContent("Image Angle", "Adjust the rotation of the image."));
+            materialEditor.ShaderProperty(_MemeImageAlignment, new GUIContent("Image Alignment", "Screen will align the image with the player's camera. Object will align it with the object's position and facing direction. Screen And Object Direciton will center it on the player's camera, but push it in the object's facing direction."));
+            materialEditor.ShaderProperty(_MemeImageYaw, new GUIContent("Image Yaw", "Spin the image horizontally."));
+            materialEditor.ShaderProperty(_MemeImagePitch, new GUIContent("Image Pitch", "Spin the image vertically."));
+            materialEditor.ShaderProperty(_MemeImageDistance, new GUIContent("Image Distance", "Adjust the distance (in meters) of the image. With Image Alignments Screen and Screen And Object Direction, 50-200+ meters is recommended. Lower values like 0 can also work well when Image Alignment is set to Object."));
             materialEditor.ShaderProperty(_MemeTexOpacity, new GUIContent("Image Opacity", "Adjust the opacity of the image."));
             materialEditor.ShaderProperty(_MemeTexClamp, new GUIContent("Image Clamp", "Select 'Yes' if the image should be clamped to the edge pixels."));
             materialEditor.ShaderProperty(_MemeTexCutOut, new GUIContent("Image Cutout", "Select 'Yes' if the image should be cutout."));
             materialEditor.ShaderProperty(_MemeTexAlphaCutOff, new GUIContent("Image Alpha Cutoff", "Adjust the minimum alpha value used to determine if the pixels should be discarded."));
             materialEditor.ShaderProperty(_MemeTexOverrideMode, new GUIContent("Image Override Mode", "Select 'None' to overlay the image on-top of cancer effects, 'Background' if the overlay should replace the screen color, and 'Empty Space' to fill in only the space created by effects like 'Screen Split'."));
-
-            GUILayout.Space(20);
-            materialEditor.ShaderProperty(_MemeImageScaleWithDistance, new GUIContent("Image Scale With Distance", "Select if the image should be scaled with distance. Recommended when using coordinate space Centered On Object."));
-
+            materialEditor.ShaderProperty(_MemeImageZTest, new GUIContent("Image ZTest", "Select 'Yes' if the image should disapear when it goes behind surfaces. Requires a Directional Light. Also useful for adjusting Image Distance in Editor without needing to go in-game to see how far away it is."));
             EditorGUI.indentLevel = 0;
         }
     }

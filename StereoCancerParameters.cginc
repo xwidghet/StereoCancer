@@ -1,6 +1,12 @@
 #ifndef STEREO_CANCER_PARAMETERS
 #define STEREO_CANCER_PARAMETERS
 
+// VRChat-Specific global shader uniforms.
+// https://docs.vrchat.com/docs/vrchat-202231
+float _VRChatCameraMode;
+float _VRChatMirrorMode;
+float3 _VRChatMirrorCameraPos;
+
 int _ParticleSystem;
 int _DisableNameplates;
 float _CoordinateSpace;
@@ -28,13 +34,17 @@ int _MemeImageColumns;
 int _MemeImageRows;
 int _MemeImageCount;
 int _MemeImageIndex;
+float _MemeImageDistance;
+int _MemeImageAlignment;
+float _MemeImagePitch;
+float _MemeImageYaw;
 float _MemeImageAngle;
 float _MemeTexOpacity;
 int _MemeTexClamp;
 int _MemeTexCutOut;
 float _MemeTexAlphaCutOff;
 float _MemeTexOverrideMode;
-int _MemeImageScaleWithDistance;
+int _MemeImageZTest;
 
 // Mask Map params
 sampler2D _MaskMap;
