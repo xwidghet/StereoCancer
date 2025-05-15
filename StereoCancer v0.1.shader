@@ -589,7 +589,7 @@ Shader "xwidghet/StereoCancer v0.1"
 					//		 of what the viewer can see.
 					v.vertex.xyz *= 100;
 
-					o.viewPos = v.vertex + float4(o.camPos, 0);
+					o.viewPos = v.vertex + float4(o.centerCamPos, 0);
 					o.viewPos = mul(UNITY_MATRIX_V, o.viewPos);
 				}
 				// World Scale
